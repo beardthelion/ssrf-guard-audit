@@ -1,0 +1,54 @@
+{
+  "instance_id": "g1-uptime-kuma-browser-monitor",
+  "repo": "louislam/uptime-kuma",
+  "repo_url": "https://github.com/louislam/uptime-kuma",
+  "license_spdx": "MIT",
+  "language": "typescript",
+  "tier": "deterministic",
+  "source": "vendored",
+  "states": {
+    "vulnerable": {
+      "sha": "b61b322c1257604906f9a9b16e5c182131a43a9f",
+      "files": [
+        {
+          "upstream_path": "server/monitor-types/real-browser-monitor-type.js",
+          "corpus_path": "corpus/g1-uptime-kuma-browser-monitor/vulnerable/server/monitor-types/real-browser-monitor-type.js",
+          "labeled_lines": [
+            250,
+            264
+          ],
+          "role": "both"
+        },
+        {
+          "upstream_path": "server/notification-providers/webhook.js",
+          "corpus_path": "corpus/g1-uptime-kuma-browser-monitor/vulnerable/server/notification-providers/webhook.js",
+          "labeled_lines": [
+            61,
+            63
+          ],
+          "role": "both"
+        }
+      ]
+    }
+  },
+  "expected": {
+    "vulnerable": [
+      "G1",
+      "G6",
+      "G8"
+    ]
+  },
+  "advisory_refs": {
+    "cve": [],
+    "ghsa": [
+      "GHSA-2qgm-m29m-cj2h"
+    ],
+    "links": [
+      "https://github.com/louislam/uptime-kuma/security/advisories/GHSA-2qgm-m29m-cj2h",
+      "https://github.com/louislam/uptime-kuma/issues/6916"
+    ]
+  },
+  "fetched_paths": [],
+  "notes": "Browser-navigation exemplar: RealBrowserMonitorType.check() validates only url.protocol (http/https, the GHSA-2qgm LFI fix) then calls page.goto(monitor.url) with headless Chromium; redirects are followed inside the browser with no re-validation and the screenshot lands in the served screenshots directory. Verified live at the pinned SHA with a loopback PoC (direct + cross-origin redirect hop both fetch the internal marker). Deterministic G1 at :260 (scheme-only guard) and G6 at :264 (page.goto). The G8 site is isAllowedChromeExecutable's env bypass shape. webhook.js carries the notification-webhook G6 shape: axios.post(notification.webhookURL) with default redirect-follow and no host check; notification payloads can carry API keys (G10-adjacent). Prior art is per-provider: Matrix provider SSRF advisory (issue #6916); no shared URL guard exists.",
+  "last_verified": "2026-10-10"
+}

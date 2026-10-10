@@ -1,0 +1,43 @@
+{
+  "instance_id": "g0-smolagents-visit-webpage",
+  "repo": "huggingface/smolagents",
+  "repo_url": "https://github.com/huggingface/smolagents",
+  "license_spdx": "Apache-2.0",
+  "language": "python",
+  "tier": "deterministic",
+  "source": "vendored",
+  "states": {
+    "vulnerable": {
+      "sha": "96f33faaf028479119ec8d34507b47694cf14e34",
+      "files": [
+        {
+          "upstream_path": "src/smolagents/default_tools.py",
+          "corpus_path": "corpus/g0-smolagents-visit-webpage/vulnerable/src/smolagents/default_tools.py",
+          "labeled_lines": [
+            515,
+            528
+          ],
+          "role": "both"
+        }
+      ]
+    }
+  },
+  "expected": {
+    "vulnerable": [
+      "G0",
+      "G8"
+    ]
+  },
+  "advisory_refs": {
+    "cve": [],
+    "ghsa": [],
+    "links": [
+      "https://github.com/huggingface/smolagents/issues/2081",
+      "https://github.com/huggingface/smolagents/pull/2370",
+      "https://github.com/huggingface/smolagents/pull/2750"
+    ]
+  },
+  "fetched_paths": [],
+  "notes": "Agent tool exemplar: VisitWebpageTool.forward(url) calls requests.get(url, timeout=20) with no scheme/host check and default redirect-follow, then returns the page as markdown to the model. Model-chosen URL reaches an unguarded sink with full read-back. Deterministic G0 at line 528. The G8 site at GoogleSearchTool.forward (lines 190-246) is a params-allowlist shape on a fixed-host search API and is included in expected for exactness. Public prior art: issue #2081 names this tool; hardening PRs #2370/#2749/#2750 open and unmerged at the pinned SHA.",
+  "last_verified": "2026-10-10"
+}

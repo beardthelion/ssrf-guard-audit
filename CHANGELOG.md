@@ -18,6 +18,17 @@ Semantic Versioning.
   entry candidates. Real-world gap seen on zcaceres/fetch-mcp:
   `Fetcher._fetch` now reports deterministic G6.
 
+### Added
+
+- Corpus: `g0-smolagents-visit-webpage` (Apache-2.0, smolagents
+  `default_tools.py` at 96f33faa): `VisitWebpageTool.forward(url)` is a
+  bare `requests.get(url)` on a model-chosen tool argument with full
+  read-back. `g1-uptime-kuma-browser-monitor` (MIT, uptime-kuma at
+  b61b322c): `RealBrowserMonitorType.check()` scheme-checks then
+  `page.goto(monitor.url)` in headless Chromium with no host/range check
+  and unchecked redirects (verified live on loopback, screenshot exfil
+  channel), plus the `webhook.js` axios redirect-follow shape.
+
 ### Changed
 
 - Corpus: `clean-zcaceres-fetch-mcp` renamed to
