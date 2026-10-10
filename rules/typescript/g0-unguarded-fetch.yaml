@@ -240,7 +240,7 @@ rules:
               - pattern: $F(...)
               - metavariable-regex:
                   metavariable: $F
-                  regex: '(fetch|nodeFetch|got|axios|request)'
+                  regex: '^(fetch|nodeFetch|got|axios|request)$'
           - pattern: axios.$M(...)
           - pattern: got.$M(...)
           - patterns:

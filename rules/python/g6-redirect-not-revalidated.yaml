@@ -241,7 +241,7 @@ rules:
                   - pattern: $F($X, ...)
                   - metavariable-regex:
                       metavariable: $F
-                      regex: '(urlopen|urlretrieve)'
+                      regex: '^(urlopen|urlretrieve)$'
               - patterns:
                   - pattern: $R.$M($X, ...)
                   - metavariable-regex:

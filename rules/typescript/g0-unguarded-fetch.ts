@@ -159,11 +159,17 @@ app.get("/preview", async (req: any, res: any) => {
 });
 
 // Positive: verb-named route handler (Next.js shape); the request member
-// read chain is the source. The searchParams.get call itself reports too
-// because the `request`-prefixed callee matches the sink vocabulary.
+// read chain is the source. The searchParams.get call is not a sink: bare
+// callee names must match the sink vocabulary exactly.
 export async function GET(request: any) {
-  // ruleid: ssrf-guard-audit-g0-typescript
   const u = request.nextUrl.searchParams.get("u");
   // ruleid: ssrf-guard-audit-g0-typescript
   return fetch(u);
+}
+
+// Negative: a dispatch-table callee that shares the `fetch` prefix is not a
+// network sink even when its argument is caller-shaped.
+async function dispatchFetchers(args: any) {
+  // ok: ssrf-guard-audit-g0-typescript
+  return fetchers[args.subcommand](args.payload);
 }
