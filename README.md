@@ -160,7 +160,7 @@ detection boundary; every rule cites it.
 
   `accepted_misses` is a manifest field: a mapping of expected class to a
   reason string for classes a sample legitimately cannot surface under the
-  documented ceilings (no recognized handler source in the file, or the
+  documented ceilings (no recognized source extent in the file, or the
   sink lives in an undecorated helper past the intra-function boundary).
   Accepted misses stay visible in the report with their reasons and do not
   gate; a miss with no `accepted_misses` entry does.
@@ -177,7 +177,7 @@ detection boundary; every rule cites it.
 - Intra-function, intra-file ceiling (Semgrep CE taint). A guard factored
   into a helper the engine cannot trace resolves to "unrecognized guard,
   manual review", not to a pass. Helper-factored sinks (`fetch` called
-  inside `safeFetch`) produce no sink at the handler site at all; the
+  inside `safeFetch`) produce no sink at the entry site at all; the
   coverage summary counts handler candidates and sinks separately so this
   cannot read as an empty scan.
 - Parameter stickiness. A tainted source parameter stays tainted for the

@@ -201,7 +201,7 @@ than papered over:
   the site resolves to unrecognized-guard. Mature codebases will produce
   this verdict often; that is expected, not a miss.
 - Helper-factored sinks. `await safeFetch(url)` where `fetch` is called
-  inside `safeFetch` produces no sink at all at the handler site. The same
+  inside `safeFetch` produces no sink at all at the entry site. The same
   applies when a recognized tool-entry method delegates to a private
   helper (`_run` calling `self._make_request(url)`, which calls
   `driver.get(url)`): the sink is enumerated but sits outside the entry
@@ -219,7 +219,7 @@ than papered over:
   collides with the vocabulary without being a full guard (for example a
   formatter named `public_url`, or a `safe_fetch` that skips range checks)
   produces a false negative.
-- Unlisted shapes are blind spots, not findings: handlers registered through
+- Unlisted shapes are blind spots, not findings: entry points registered through
   entry-point lists whose callbacks take differently named parameters (the
   dispatch-method source requires an `args`-style parameter name), and
   network clients not in the sink list (raw `http.request` in Node,
@@ -240,5 +240,5 @@ a `urlparse`-only and scheme-only path (the incumbent registry rule's false
 negative is our true positive), unrecognized helper guards, and the
 parameter-stickiness ceiling case. Negative cases (annotated quiet):
 recognized complete-guard calls in both forms, hardcoded literal URLs, and
-sinks outside any recognized handler. `tests/fixtures/g0/` holds small
+sinks outside any recognized entry point. `tests/fixtures/g0/` holds small
 synthetic repos with the same shapes for CLI-level tests.
