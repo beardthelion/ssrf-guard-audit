@@ -1,0 +1,48 @@
+{
+  "instance_id": "g8-crewai-ssrf-adapter-escape-hatch",
+  "repo": "crewAIInc/crewAI",
+  "repo_url": "https://github.com/crewAIInc/crewAI",
+  "license_spdx": "MIT",
+  "language": "python",
+  "tier": "deterministic",
+  "source": "vendored",
+  "states": {
+    "vulnerable": {
+      "sha": "894898f84c4ac0a89f24bf7bee6c381eb0e67f51",
+      "files": [
+        {
+          "upstream_path": "lib/crewai-tools/src/crewai_tools/security/safe_requests.py",
+          "corpus_path": "corpus/g8-crewai-ssrf-adapter-escape-hatch/vulnerable/lib/crewai-tools/src/crewai_tools/security/safe_requests.py",
+          "labeled_lines": [
+            115
+          ],
+          "role": "sink"
+        },
+        {
+          "upstream_path": "lib/crewai-tools/src/crewai_tools/security/ssrf_adapter.py",
+          "corpus_path": "corpus/g8-crewai-ssrf-adapter-escape-hatch/vulnerable/lib/crewai-tools/src/crewai_tools/security/ssrf_adapter.py",
+          "labeled_lines": [
+            87
+          ],
+          "role": "guard"
+        }
+      ]
+    }
+  },
+  "expected": {
+    "vulnerable": [
+      "G6",
+      "G8"
+    ]
+  },
+  "advisory_refs": {
+    "cve": [],
+    "ghsa": [],
+    "links": [
+      "https://github.com/crewAIInc/crewAI"
+    ]
+  },
+  "fetched_paths": [],
+  "notes": "Two shapes worth pinning. ssrf_adapter.create_validated_connection gates every check behind the _is_escape_hatch_enabled() env bypass, the default-bypass shape G8 names. safe_requests._raw_get passes the caller URL to a session whose guard lives in the adapter factory, invisible to the intra-function read, so the sink resolves to G6. These are the tool's documented lexical-recognition ceiling, not a claimed upstream defect.",
+  "last_verified": "2026-10-09"
+}

@@ -1,0 +1,40 @@
+{
+  "instance_id": "g0-frappe-webhook-dispatch",
+  "repo": "frappe/frappe",
+  "repo_url": "https://github.com/frappe/frappe",
+  "license_spdx": "MIT",
+  "language": "python",
+  "tier": "deterministic",
+  "source": "vendored",
+  "states": {
+    "vulnerable": {
+      "sha": "e8bc81e64649fbb61b9c5cb00c67e26f4d209f32",
+      "files": [
+        {
+          "upstream_path": "frappe/integrations/doctype/webhook/webhook.py",
+          "corpus_path": "corpus/g0-frappe-webhook-dispatch/vulnerable/frappe/integrations/doctype/webhook/webhook.py",
+          "labeled_lines": [
+            206,
+            207
+          ],
+          "role": "sink"
+        }
+      ]
+    }
+  },
+  "expected": {
+    "vulnerable": [
+      "G0"
+    ]
+  },
+  "advisory_refs": {
+    "cve": [],
+    "ghsa": [],
+    "links": [
+      "https://github.com/frappe/frappe"
+    ]
+  },
+  "fetched_paths": [],
+  "notes": "Non-MCP webhook family. webhook.request_url is an operator-configured URL; send_webhook_request (line 206) passes it straight to requests.request (line 207). The only URL check in-file is validate_request_url asserting a non-empty netloc: no scheme allowlist, no resolution, no range check. The G10 checklist fires on the headers kwarg (credentials on a caller-chosen host). No CVE; audited code shape at pinned HEAD.",
+  "last_verified": "2026-10-09"
+}
