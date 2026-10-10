@@ -220,13 +220,20 @@ labels give the pinned SHA (8 chars) and expected class set. Full detail lives i
 | g5-auth-fetch-mcp-ipv6-normalization | ymw0407/auth-fetch-mcp | vuln 42daa70c (G5+G8); patched 177ec5f8 (G8, plus G7 checklist residual) | CVE-2026-49857 / GHSA-pvrj-8cg3-j5f8 | MIT | vendored |
 | g6-praisonaiagents-web-crawl-redirect | MervinPraison/PraisonAI | vuln 9991e00f (G6+G8); patched 2f9677ab (G6+G8) | CVE-2026-55525, CVE-2026-55523, CVE-2026-55524 | MIT | vendored |
 | checklist-mcp-atlassian-g7 | sooperset/mcp-atlassian | vuln 52b9b099 (G7); patched 5cd697df (G7) | CVE-2026-27826 / GHSA-7r34-79r5-rcc9 | MIT | vendored |
-| clean-zcaceres-fetch-mcp | zcaceres/fetch-mcp | guarded 1ddb1a59 (CLEAN) | none | MIT | vendored |
+| g6-zcaceres-fetch-mcp-redirect | zcaceres/fetch-mcp | guarded 1ddb1a59 (G6; fetch follows redirects, `response.url` re-check runs after the hop connects) | none | MIT | vendored |
 | clean-crewai-scrape-website-tool | crewAIInc/crewAI | guarded 894898f8 (CLEAN; caller slice only) | none | MIT | vendored |
 | g0-frappe-webhook-dispatch | frappe/frappe | vuln e8bc81e6 (G0) | none | MIT | vendored |
 | g1-anythingllm-url-validation | Mintplex-Labs/anything-llm | vuln 2a10d052 (G1) | none | MIT | vendored |
 | g6-gptme-browser-playwright | gptme/gptme | vuln 292f8a5b (G6) | issue 1021 | MIT | vendored |
 | g8-crewai-ssrf-adapter-escape-hatch | crewAIInc/crewAI | vuln 894898f8 (G6+G8) | none | MIT | vendored |
 | clean-firecrawl-safe-fetch | firecrawl/firecrawl | fetched b3cc08da (CLEAN) | none | AGPL-3.0 | fetched |
+
+`CLEAN` on a row means no deterministic G0-G6/G8 class fired on the pinned
+slice under the analyzer's documented ceilings. It is not a claim of a
+complete SSRF defense: checklist-tier classes (G7 rebinding, G9 coverage,
+G10 credentials) and guards the analyzer cannot see (factory-mounted
+adapters, helpers in another file) can still apply. Read `notes` in each
+instance's `metadata.json` for the residual-shape commentary.
 
 ## Development
 

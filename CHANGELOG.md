@@ -5,6 +5,32 @@ All notable changes to this project will be documented in this file.
 The format is based on Keep a Changelog, and this project adheres to
 Semantic Versioning.
 
+## [Unreleased]
+
+### Fixed
+
+- TypeScript/JavaScript taint sources now cover URL-named fields
+  destructured in function signatures (`_fetch({ url, headers })`,
+  `({ url }: RequestPayload) => ...`) and in destructuring assignments
+  (`const { url } = payload`), so a payload-field URL reaching a
+  redirect-following `fetch`/`axios`/`got` now fires G0/G6 instead of
+  going dark. The site-probe source probe marks the same functions as
+  entry candidates. Real-world gap seen on zcaceres/fetch-mcp:
+  `Fetcher._fetch` now reports deterministic G6.
+
+### Changed
+
+- Corpus: `clean-zcaceres-fetch-mcp` renamed to
+  `g6-zcaceres-fetch-mcp-redirect` with `expected: [G6]`. Its post-fetch
+  `response.url` re-check happens after the redirect hop connects, so it
+  is a partial guard, not a clean exemplar. `CLEAN` rows are now
+  documented in the README as "no deterministic class under current
+  ceilings", not a claim of complete SSRF defense.
+- Docs: `docs/source-sink-matrix.md` documents the destructured-field
+  source and a new blind spot for factory-mounted / session-adapter
+  guards (a `requests.Session` mounted with a guarded adapter is
+  invisible at the call site).
+
 ## [0.1.0] - 2026-10-09
 
 ### Added

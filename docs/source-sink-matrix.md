@@ -93,6 +93,11 @@ A parameter is a source when:
   or object-literal callback whose name starts with `execute`, `handle`,
   `dispatch`, `process`, `invoke`, `run`, or `call`, with a parameter
   named `args`, `arguments`, `params`, `request`, or `input`.
+- The enclosing signature destructures a URL-named object field in a
+  parameter: `function f({ url, headers })`,
+  `async _fetch({ url }: RequestPayload)`, arrow or method form, typed or
+  not. The parameter itself is an object, but the field binding is a
+  source for the whole body. Covers `_fetch({ url, headers, proxy })`.
 
 An expression is a source when it reads a caller-shaped field:
 
@@ -111,6 +116,10 @@ An expression is a source when it reads a caller-shaped field:
   `query`, `body`, `params`, `nextUrl`, `searchParams`, or `formData`:
   every destructured binding is a source. Covers
   `const { url } = req.query`.
+- Destructuring `const { url } = <obj>` (also `let`, `var`, and bare
+  assignment) where the destructured field name is URL-shaped: the binding
+  is a source from any object, not just request members. Covers
+  `const { url } = payload`.
 
 ## Sinks: outbound request calls
 
@@ -208,6 +217,16 @@ than papered over:
   extent, so it lands in the "outside recognized entries" review list
   rather than auto-classifying. Coverage reporting counts entry
   candidates and sinks separately so this cannot read as an empty scan.
+- Factory-mounted and session-adapter guards. A complete guard attached
+  to a transport object is invisible at the call site: a
+  `requests.Session` mounted with an SSRF adapter (linkding's
+  `GuardedHTTPAdapter` resolves, range-checks, and connects per redirect
+  hop), or a session built by a guard factory (crewAI's
+  `safe_requests`/adapter pattern), makes `http_client.get(url)` look
+  unguarded to lexical analysis. The deterministic class still fires at
+  the call site. Do not treat those hits as unguarded; they are the
+  ceiling this analyzer cannot see past, the same shape the corpus's
+  `g8-crewai-ssrf-adapter-escape-hatch` instance documents.
 - Parameter stickiness. A source parameter stays tainted for the whole
   function body: reassigning it (`url = "literal"`) or check-and-throwing on
   it directly (`assert_public_url(url)` then `requests.get(url)`) does not

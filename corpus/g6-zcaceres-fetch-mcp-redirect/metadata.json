@@ -1,0 +1,41 @@
+{
+  "instance_id": "g6-zcaceres-fetch-mcp-redirect",
+  "repo": "zcaceres/fetch-mcp",
+  "repo_url": "https://github.com/zcaceres/fetch-mcp",
+  "license_spdx": "MIT",
+  "language": "typescript",
+  "tier": "deterministic",
+  "source": "vendored",
+  "states": {
+    "guarded": {
+      "sha": "1ddb1a59cb09a2d38e759f2d7a97829680cbe514",
+      "files": [
+        {
+          "upstream_path": "src/Fetcher.ts",
+          "corpus_path": "corpus/g6-zcaceres-fetch-mcp-redirect/guarded/src/Fetcher.ts",
+          "labeled_lines": [
+            64,
+            82
+          ],
+          "role": "both"
+        }
+      ]
+    }
+  },
+  "expected": {
+    "guarded": [
+      "G6"
+    ]
+  },
+  "advisory_refs": {
+    "cve": [],
+    "ghsa": [],
+    "links": [
+      "https://github.com/zcaceres/fetch-mcp/pull/37",
+      "https://github.com/zcaceres/fetch-mcp/pull/45"
+    ]
+  },
+  "fetched_paths": [],
+  "notes": "Partially guarded exemplar, not a clean one. _fetch() takes a destructured { url, headers, proxy } RequestPayload field; validateUrl() strips brackets before the private-ip check and validateResolvedIp() checks the first resolved address, but fetch() follows redirects and connects to a fresh resolution. The response.url check at line 82 re-validates the final URL only after the redirect hop has already connected, so a 302 to an internal address still issues the request (blind SSRF; response content is withheld). Deterministic G6 at the fetch site (line 64), residual checklist G7 at the dns.lookup site (line 43). Upstream: PR #37 merged the partial guard; PR #45 proposed connect-time pinning and per-hop re-validation and was closed unmerged.",
+  "last_verified": "2026-10-10"
+}

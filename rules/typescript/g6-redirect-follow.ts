@@ -93,3 +93,40 @@ async function plain(arg: string) {
   // ok: ssrf-guard-audit-g6-typescript
   return fetch(arg, { redirect: "follow" });
 }
+
+// Positive: destructured object parameter field — `_fetch({ url, headers })`
+// binds caller-shaped input to `url` even though the parameter is an
+// object (RequestPayload shape). Default redirect follow, entry-URL check
+// only.
+async function fetchPayload({ url, headers }: { url: string; headers: any }): Promise<any> {
+  validate(url);
+  // ruleid: ssrf-guard-audit-g6-typescript
+  return fetch(url, { headers });
+}
+
+// Positive: destructuring assignment binds the URL-named field.
+async function fetchLocal(payload: { url: string }) {
+  const { url } = payload;
+  validate(url);
+  // ruleid: ssrf-guard-audit-g6-typescript
+  return fetch(url);
+}
+
+// Positive: dotted member read `payload.url` feeding the same call.
+async function fetchMember(payload: { url: string }) {
+  validate(payload.url);
+  // ruleid: ssrf-guard-audit-g6-typescript
+  return fetch(payload.url);
+}
+
+// Negative: destructured field name is outside the URL vocabulary.
+async function fetchNamed({ name }: { name: string }) {
+  // ok: ssrf-guard-audit-g6-typescript
+  return fetch(name);
+}
+
+// Negative: destructured URL field but redirects are pinned manual.
+async function fetchPinned({ url }: { url: string }) {
+  // ok: ssrf-guard-audit-g6-typescript
+  return fetch(url, { redirect: "manual" });
+}

@@ -133,6 +133,49 @@ rules:
                   var { ..., $PROP, ... } = $REQ.$M
               - pattern-inside: |
                   { ..., $PROP, ... } = $REQ.$M
+      # Destructured URL-named object fields: `_fetch({ url, headers })`,
+      # `({ url }: RequestPayload)` and `const { url } = payload` bind a
+      # caller-shaped field to a local even though the parameter itself is
+      # an object. Covers function declarations, methods, and arrows, with
+      # or without a type annotation, plus destructuring assignments.
+      - patterns:
+          - pattern: $V
+          - metavariable-regex:
+              metavariable: $V
+              regex: '(?i)^(url|uri|href|link|endpoint|callback_?url|webhook_?url|jwks_?(uri|url)|avatar_?url|image_?url|feed_?url|target|host)$|^([a-z_0-9]+_(url|uri|href|endpoint|webhook)|[a-z_0-9]+(Url|Uri|Href|Endpoint|Webhook))$'
+          - pattern-either:
+              - pattern-inside: |
+                  function $F(..., { ..., $V, ... }: $T, ...) { ... }
+              - pattern-inside: |
+                  function $F(..., { ..., $V, ... }, ...) { ... }
+              - pattern-inside: |
+                  async function $F(..., { ..., $V, ... }: $T, ...) { ... }
+              - pattern-inside: |
+                  async function $F(..., { ..., $V, ... }, ...) { ... }
+              - pattern-inside: |
+                  $F(..., { ..., $V, ... }: $T, ...) { ... }
+              - pattern-inside: |
+                  $F(..., { ..., $V, ... }, ...) { ... }
+              - pattern-inside: |
+                  async $F(..., { ..., $V, ... }: $T, ...) { ... }
+              - pattern-inside: |
+                  async $F(..., { ..., $V, ... }, ...) { ... }
+              - pattern-inside: |
+                  (..., { ..., $V, ... }: $T, ...) => { ... }
+              - pattern-inside: |
+                  (..., { ..., $V, ... }, ...) => { ... }
+              - pattern-inside: |
+                  async (..., { ..., $V, ... }: $T, ...) => { ... }
+              - pattern-inside: |
+                  async (..., { ..., $V, ... }, ...) => { ... }
+              - pattern-inside: |
+                  const { ..., $V, ... } = $X
+              - pattern-inside: |
+                  let { ..., $V, ... } = $X
+              - pattern-inside: |
+                  var { ..., $V, ... } = $X
+              - pattern-inside: |
+                  { ..., $V, ... } = $X
       # Verb-named route handlers (Next.js style): export async function
       # GET(request) — the request parameter is the source.
       - patterns:

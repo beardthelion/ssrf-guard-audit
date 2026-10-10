@@ -37,3 +37,31 @@ server.tool("g2", {}, async ({ url }) => {
   // ok: ssrf-guard-audit-g6-typescript
   return got(url, { beforeRedirect: (opts) => validate(opts.url) });
 });
+
+// Positive: destructured object parameter field, default redirect follow.
+async function fetchPayload({ url, headers }) {
+  validate(url);
+  // ruleid: ssrf-guard-audit-g6-typescript
+  return fetch(url, { headers });
+}
+
+// Positive: destructuring assignment binds the URL-named field.
+async function fetchLocal(payload) {
+  const { url } = payload;
+  validate(url);
+  // ruleid: ssrf-guard-audit-g6-typescript
+  return fetch(url);
+}
+
+// Positive: dotted member read `payload.url`.
+async function fetchMember(payload) {
+  validate(payload.url);
+  // ruleid: ssrf-guard-audit-g6-typescript
+  return fetch(payload.url);
+}
+
+// Negative: destructured field name is outside the URL vocabulary.
+async function fetchNamed({ name }) {
+  // ok: ssrf-guard-audit-g6-typescript
+  return fetch(name);
+}

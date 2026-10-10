@@ -136,6 +136,39 @@ rules:
           - metavariable-regex:
               metavariable: $ARG
               regex: '^([a-z_0-9]+_(url|uri|href|endpoint|webhook)|[a-z_0-9]+(Url|Uri|Href|Endpoint|Webhook))(\W.*)?$'
+      # Functions, methods, or arrows whose parameters destructure a
+      # URL-named object field: `_fetch({ url, headers })`,
+      # `({ url }: RequestPayload) => ...`. The field binding is
+      # caller-shaped input even though the parameter is an object.
+      - patterns:
+          - pattern-either:
+              - pattern: |
+                  function $F(..., { ..., $V, ... }: $T, ...) { ... }
+              - pattern: |
+                  function $F(..., { ..., $V, ... }, ...) { ... }
+              - pattern: |
+                  async function $F(..., { ..., $V, ... }: $T, ...) { ... }
+              - pattern: |
+                  async function $F(..., { ..., $V, ... }, ...) { ... }
+              - pattern: |
+                  $M(..., { ..., $V, ... }: $T, ...) { ... }
+              - pattern: |
+                  $M(..., { ..., $V, ... }, ...) { ... }
+              - pattern: |
+                  async $M(..., { ..., $V, ... }: $T, ...) { ... }
+              - pattern: |
+                  async $M(..., { ..., $V, ... }, ...) { ... }
+              - pattern: |
+                  (..., { ..., $V, ... }: $T, ...) => { ... }
+              - pattern: |
+                  (..., { ..., $V, ... }, ...) => { ... }
+              - pattern: |
+                  async (..., { ..., $V, ... }: $T, ...) => { ... }
+              - pattern: |
+                  async (..., { ..., $V, ... }, ...) => { ... }
+          - metavariable-regex:
+              metavariable: $V
+              regex: '(?i)^(url|uri|href|link|endpoint|callback_?url|webhook_?url|jwks_?(uri|url)|avatar_?url|image_?url|feed_?url|target|host)$|^([a-z_0-9]+_(url|uri|href|endpoint|webhook)|[a-z_0-9]+(Url|Uri|Href|Endpoint|Webhook))$'
       # Functions containing URL-named member reads or request-object
       # member reads (config objects, payload objects, query/body fields).
       # Member names here are broader than the taint source's
