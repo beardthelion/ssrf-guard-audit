@@ -1,0 +1,40 @@
+{
+  "instance_id": "g1-anythingllm-url-validation",
+  "repo": "Mintplex-Labs/anything-llm",
+  "repo_url": "https://github.com/Mintplex-Labs/anything-llm",
+  "license_spdx": "MIT",
+  "language": "typescript",
+  "tier": "deterministic",
+  "source": "vendored",
+  "states": {
+    "vulnerable": {
+      "sha": "2a10d052a1812d7be12c43f9024072cf26a27a8b",
+      "files": [
+        {
+          "upstream_path": "collector/utils/url/index.js",
+          "corpus_path": "corpus/g1-anythingllm-url-validation/vulnerable/collector/utils/url/index.js",
+          "labeled_lines": [
+            67,
+            133
+          ],
+          "role": "guard"
+        }
+      ]
+    }
+  },
+  "expected": {
+    "vulnerable": [
+      "G1"
+    ]
+  },
+  "advisory_refs": {
+    "cve": [],
+    "ghsa": [],
+    "links": [
+      "https://github.com/Mintplex-Labs/anything-llm"
+    ]
+  },
+  "fetched_paths": [],
+  "notes": "Non-MCP link-scraper family. validURL keeps only http:/https: schemes (G1) and hands the parsed URL to isInvalidIp, a first-octet IPv4 blocklist gated by the COLLECTOR_ALLOW_ANY_IP env bypass; upstream comments state the check is not a security boundary. The network sink lives in other collector files, so this slice labels the guard function only. The first-octet blocklist and the env bypass are noted misses against the current sink vocabulary.",
+  "last_verified": "2026-10-09"
+}

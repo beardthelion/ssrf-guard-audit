@@ -1,0 +1,38 @@
+{
+  "instance_id": "clean-crewai-scrape-website-tool",
+  "repo": "crewAIInc/crewAI",
+  "repo_url": "https://github.com/crewAIInc/crewAI",
+  "license_spdx": "MIT",
+  "language": "python",
+  "tier": "deterministic",
+  "source": "vendored",
+  "states": {
+    "guarded": {
+      "sha": "894898f84c4ac0a89f24bf7bee6c381eb0e67f51",
+      "files": [
+        {
+          "upstream_path": "lib/crewai-tools/src/crewai_tools/tools/scrape_website_tool/scrape_website_tool.py",
+          "corpus_path": "corpus/clean-crewai-scrape-website-tool/guarded/lib/crewai-tools/src/crewai_tools/tools/scrape_website_tool/scrape_website_tool.py",
+          "labeled_lines": [
+            7,
+            77
+          ],
+          "role": "guard-call"
+        }
+      ]
+    }
+  },
+  "expected": {
+    "guarded": [
+      "CLEAN"
+    ]
+  },
+  "advisory_refs": {
+    "cve": [],
+    "ghsa": [],
+    "links": []
+  },
+  "fetched_paths": [],
+  "notes": "Recognized-complete exemplar. ScrapeWebsiteTool._run calls safe_get() (line 77), which validates every redirect hop and routes through SSRFProtectedAdapter with a post-connect getpeername() re-check, the in-repo fix for the G7 class. The guard is helper-factored, so an intra-function engine should report unrecognized-guard rather than a weak class; either way no deterministic finding is expected. The security/ adapter files moved to g8-crewai-ssrf-adapter-escape-hatch; this row keeps the caller slice only.",
+  "last_verified": "2026-09-14"
+}

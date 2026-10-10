@@ -1,0 +1,43 @@
+{
+  "instance_id": "g6-gptme-browser-playwright",
+  "repo": "gptme/gptme",
+  "repo_url": "https://github.com/gptme/gptme",
+  "license_spdx": "MIT",
+  "language": "python",
+  "tier": "deterministic",
+  "source": "vendored",
+  "states": {
+    "vulnerable": {
+      "sha": "292f8a5be5fba2d5ad1a0c616811fffd57c26001",
+      "files": [
+        {
+          "upstream_path": "gptme/tools/_browser_playwright.py",
+          "corpus_path": "corpus/g6-gptme-browser-playwright/vulnerable/gptme/tools/_browser_playwright.py",
+          "labeled_lines": [
+            203,
+            560,
+            561,
+            653,
+            1168
+          ],
+          "role": "both"
+        }
+      ]
+    }
+  },
+  "expected": {
+    "vulnerable": [
+      "G6"
+    ]
+  },
+  "advisory_refs": {
+    "cve": [],
+    "ghsa": [],
+    "links": [
+      "https://github.com/gptme/gptme/issues/1021"
+    ]
+  },
+  "fetched_paths": [],
+  "notes": "Non-MCP agent browser tool. page.goto(url) follows redirects inside _load_page, _get_aria_snapshot, _open_page, and _take_screenshot; entry-URL validation (_validate_entry_url) runs in the callers and the live-URL check (_validate_page_url) runs after navigation, so no redirect hop is re-validated and each sink site resolves to G6. The .url member reads mark the same functions as entry extents.",
+  "last_verified": "2026-10-09"
+}

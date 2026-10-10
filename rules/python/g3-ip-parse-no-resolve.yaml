@@ -1,0 +1,291 @@
+rules:
+  - id: ssrf-guard-audit-g3-python
+    mode: taint
+    message: >-
+      Caller-shaped URL input reaches a literal IP parse
+      (ipaddress.ip_address / IPv4Address / IPv6Address / inet_aton /
+      inet_pton) with no DNS resolution of the hostname in the same function
+      (G3: literal IP check without resolution). A hostname that is not an
+      IP literal is parsed as "not an IP" and allowed, so
+      127.0.0.1.nip.io or any controlled A record bypasses the range check.
+    severity: ERROR
+    languages: [python]
+    metadata:
+      category: security
+      subcategory: [audit]
+      guard_class: G3
+      cwe:
+        - "CWE-918: Server-Side Request Forgery (SSRF)"
+      confidence: HIGH
+      likelihood: MEDIUM
+      impact: HIGH
+      technology: [ssrf, python]
+      advisory_refs:
+        - "CVE-2026-55526 / GHSA-x44h-65qv-cw74 (MervinPraison/PraisonAI SpiderTools _host_is_blocked returns False when ipaddress.ip_address and inet_aton both fail, so every resolvable hostname passes)"
+      references:
+        - docs/source-sink-matrix.md
+    # Sources: the entry-point vocabulary of docs/source-sink-matrix.md --
+    # URL-named parameters, URL-named field reads, request-object members,
+    # and registered entry points (route decorators, tool registrations,
+    # dispatch methods, Tool-class entry methods).
+    pattern-sources:
+      # Sources (the contract lives in docs/source-sink-matrix.md). A source
+      # is any caller-shaped URL input: an explicit URL parameter, a
+      # URL-named field read off a config/request/payload object, a
+      # request-object member (query/body), or a parameter of a registered
+      # entry point (web route decorators, agent/tool registrations,
+      # dispatch methods, Tool-class entry methods). A tainted parameter
+      # stays tainted for the whole function body (parameter stickiness);
+      # the matrix doc covers the ceiling notes.
+      #
+      # URL-named parameters of any function or method, registered or not:
+      # `def fetch(url)` is an entry point for this analyzer.
+      - patterns:
+          - pattern: $ARG
+          - metavariable-regex:
+              metavariable: $ARG
+              regex: '(?i)^(url|uri|href|link|endpoint|callback_?url|callback|webhook_?url|webhook|jwks_?(uri|url)|avatar_?url|image_?url|feed_?url|target|host)(\W.*)?$'
+          - pattern-either:
+              - pattern-inside: |
+                  def $F(..., $ARG, ...):
+                    ...
+              - pattern-inside: |
+                  async def $F(..., $ARG, ...):
+                    ...
+      # Suffix forms: page_url, callbackUrl, feed_url, site_url, ...
+      # Case-sensitive camel halves keep `curl`-style names out.
+      - patterns:
+          - pattern: $ARG
+          - metavariable-regex:
+              metavariable: $ARG
+              regex: '^([a-z_0-9]+_(url|uri|href|endpoint|webhook)|[a-z_0-9]+(Url|Uri|Href|Endpoint|Webhook))(\W.*)?$'
+          - pattern-either:
+              - pattern-inside: |
+                  def $F(..., $ARG, ...):
+                    ...
+              - pattern-inside: |
+                  async def $F(..., $ARG, ...):
+                    ...
+      # URL-named attribute reads off any object (config objects, payload
+      # models, parsed request objects): cfg.webhook_url, options.url,
+      # request.url, ...
+      - patterns:
+          - pattern: $X.$F
+          - metavariable-regex:
+              metavariable: $F
+              regex: '(?i)^(url|uri|href|link|endpoint|callback_?url|webhook_?url|jwks_?(uri|url)|avatar_?url|image_?url|feed_?url|target|host)$'
+      # URL-named key reads: config["webhook_url"], payload.get("url"),
+      # request.args["target"], kwargs["feed_url"], ...
+      - patterns:
+          - pattern-either:
+              - pattern: $X[$K]
+              - pattern: $X.get($K, ...)
+          - metavariable-regex:
+              metavariable: $K
+              regex: >-
+                (?i)^["'](url|uri|href|link|endpoint|callback_?url|webhook_?url|jwks_?(uri|url)|avatar_?url|image_?url|feed_?url|target|host)["']$
+      # HTTP request-object members (Flask/Django/FastAPI/Starlette/aiohttp
+      # style): query/body member reads off a request receiver are
+      # caller-controlled. Receiver-gated so unrelated .data/.params
+      # attributes are not sources.
+      - patterns:
+          - pattern: $REQ.$F
+          - metavariable-regex:
+              metavariable: $REQ
+              regex: '(.*\.)?(request|req)$'
+          - metavariable-regex:
+              metavariable: $F
+              regex: '^(args|GET|POST|query_params|path_params|form|data|json|params|values|query|body)$'
+      # Route decorators: any parameter of a function registered via a web
+      # route/handler decorator (Flask/Bottle @app.route/@get,
+      # FastAPI/Starlette @router.get, Django REST @api_view/@action). The
+      # decorator method name is the signal, not the receiver.
+      - patterns:
+          - pattern: $ARG
+          - metavariable-regex:
+              metavariable: $DECO
+              regex: '(.*\.)?(route|api_route|get|post|put|delete|patch|head|options|websocket|add_url_rule|api_view|action)$'
+          - pattern-either:
+              - pattern-inside: |
+                  @$DECO(...)
+                  def $F(..., $ARG, ...):
+                    ...
+              - pattern-inside: |
+                  @$DECO(...)
+                  async def $F(..., $ARG, ...):
+                    ...
+              - pattern-inside: |
+                  @$DECO
+                  def $F(..., $ARG, ...):
+                    ...
+              - pattern-inside: |
+                  @$DECO
+                  async def $F(..., $ARG, ...):
+                    ...
+      # Agent/tool registrations (one entry family among several): any
+      # parameter of a function decorated as a tool entry point. The
+      # decorator method name is the signal, not the receiver, so FastMCP,
+      # low-level SDK servers, and vendored variants all match. A tainted
+      # `arguments` dict taints every value extracted from it
+      # (arguments["url"], arguments.get("url")).
+      - patterns:
+          - pattern: $ARG
+          # metavariable-regex is a full match on the bound text, so the
+          # receiver prefix must be spelled out.
+          - metavariable-regex:
+              metavariable: $DECO
+              regex: '(.*\.)?(tool|call_tool|get_prompt)'
+          - pattern-either:
+              - pattern-inside: |
+                  @$DECO(...)
+                  def $F(..., $ARG, ...):
+                    ...
+              - pattern-inside: |
+                  @$DECO(...)
+                  async def $F(..., $ARG, ...):
+                    ...
+              - pattern-inside: |
+                  @$DECO
+                  def $F(..., $ARG, ...):
+                    ...
+              - pattern-inside: |
+                  @$DECO
+                  async def $F(..., $ARG, ...):
+                    ...
+      # Dispatch-method source: a function or method named like a tool
+      # dispatcher whose parameters include args/params/request. Covers
+      # class-based registries where a registered callback delegates to
+      # `tool.execute(args)` and the sink lives in the method body.
+      - patterns:
+          - pattern: $ARG
+          - metavariable-regex:
+              metavariable: $ARG
+              regex: '^(args|arguments|params|request|input)(\W.*)?$'
+          - pattern-either:
+              - pattern-inside: |
+                  async def $M(..., $ARG, ...):
+                    ...
+              - pattern-inside: |
+                  def $M(..., $ARG, ...):
+                    ...
+          - metavariable-regex:
+              metavariable: $M
+              regex: '^(execute|handle|dispatch|process|invoke|run|call)[a-z_0-9]*$'
+      # Framework tool-entry source: agent frameworks that deliver
+      # caller-produced args through `Tool.forward`/`BaseTool._run`-style
+      # methods on Tool-named classes. The class-name bound keeps the
+      # method names from matching arbitrary helpers. First branch: named
+      # params. Second: **kwargs, which Semgrep binds separately as a
+      # ParamDict.
+      - patterns:
+          - pattern: $ARG
+          - pattern-either:
+              - pattern-inside: |
+                  class $T(...):
+                    ...
+                    async def $M($SELF, ..., $ARG, ...):
+                      ...
+              - pattern-inside: |
+                  class $T(...):
+                    ...
+                    def $M($SELF, ..., $ARG, ...):
+                      ...
+          - metavariable-regex:
+              metavariable: $T
+              regex: '(?i).*tool'
+          - metavariable-regex:
+              metavariable: $M
+              regex: '^(forward|_?run|_?arun|_?call|_?execute|invoke|process)[a-z_0-9]*$'
+          - metavariable-regex:
+              metavariable: $ARG
+              regex: '^(?!self$|cls$).*'
+      - patterns:
+          - pattern: $KW
+          - pattern-either:
+              - pattern-inside: |
+                  class $T(...):
+                    ...
+                    async def $M($SELF, ..., **$KW):
+                      ...
+              - pattern-inside: |
+                  class $T(...):
+                    ...
+                    def $M($SELF, ..., **$KW):
+                      ...
+          - metavariable-regex:
+              metavariable: $T
+              regex: '(?i).*tool'
+          - metavariable-regex:
+              metavariable: $M
+              regex: '^(forward|_?run|_?arun|_?call|_?execute|invoke|process)[a-z_0-9]*$'
+    # Sink: a tainted value parsed as an IP literal. inet_aton and inet_pton
+    # parse numeric forms only; they never consult DNS, so they belong to
+    # the G3 shape, not to the resolver exclusion list.
+    pattern-sinks:
+      - patterns:
+          - pattern-either:
+              - pattern: ipaddress.$M($X, ...)
+              - pattern: ip_address($X, ...)
+              - pattern: ip_network($X, ...)
+              - pattern: ip_interface($X, ...)
+              - pattern: IPv4Address($X, ...)
+              - pattern: IPv6Address($X, ...)
+              - pattern: IPv4Network($X, ...)
+              - pattern: IPv6Network($X, ...)
+              - pattern: socket.inet_aton($X, ...)
+              - pattern: socket.inet_pton($X, ...)
+              - pattern: inet_aton($X, ...)
+              - pattern: inet_pton($X, ...)
+          - focus-metavariable: $X
+          # Exclusion: a function that also resolves the host through DNS
+          # (getaddrinfo/gethostbyname family, dnspython) is the
+          # resolve-then-check shape, not G3. One not-inside entry per
+          # resolver name; metavariable-regex cannot constrain not-inside
+          # bindings, so names are enumerated and the deep-expression form
+          # covers calls nested in conditions, comprehensions, and
+          # assignments.
+          - pattern-not-inside: |
+              def $F(...):
+                ...
+                <... socket.getaddrinfo(...) ...>
+                ...
+          - pattern-not-inside: |
+              def $F(...):
+                ...
+                <... socket.gethostbyname(...) ...>
+                ...
+          - pattern-not-inside: |
+              def $F(...):
+                ...
+                <... socket.gethostbyname_ex(...) ...>
+                ...
+          - pattern-not-inside: |
+              def $F(...):
+                ...
+                <... socket.gethostbyaddr(...) ...>
+                ...
+          - pattern-not-inside: |
+              def $F(...):
+                ...
+                <... getaddrinfo(...) ...>
+                ...
+          - pattern-not-inside: |
+              def $F(...):
+                ...
+                <... gethostbyname(...) ...>
+                ...
+          - pattern-not-inside: |
+              def $F(...):
+                ...
+                <... gethostbyname_ex(...) ...>
+                ...
+          - pattern-not-inside: |
+              def $F(...):
+                ...
+                <... gethostbyaddr(...) ...>
+                ...
+          - pattern-not-inside: |
+              def $F(...):
+                ...
+                <... dns.resolver.$M(...) ...>
+                ...

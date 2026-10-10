@@ -1,0 +1,319 @@
+rules:
+  - id: ssrf-guard-audit-g1-python
+    mode: taint
+    message: >-
+      Caller-shaped URL input reaches a scheme check (urlparse/urlsplit
+      .scheme membership or equality) that is the only validation on the
+      tainted path in this function: no DNS resolution, no ipaddress parse,
+      and no hostname/netloc check call intervenes (G1: scheme-only guard).
+      http://169.254.169.254/ passes a scheme check. classify.py suppresses
+      the sibling G0 finding at the same site.
+    severity: ERROR
+    languages: [python]
+    metadata:
+      category: security
+      subcategory: [audit]
+      guard_class: G1
+      cwe:
+        - "CWE-918: Server-Side Request Forgery (SSRF)"
+      confidence: HIGH
+      likelihood: MEDIUM
+      impact: HIGH
+      technology: [ssrf, python]
+      advisory_refs:
+        - "CVE-2026-26118 / GHSA-hhfx-wfvq-7g9c (jae-jae/fetcher-mcp validateUrlProtocol checks only that the scheme is http/https; same shape as the Azure MCP Server advisory)"
+      references:
+        - docs/source-sink-matrix.md
+    # Sources: the entry-point vocabulary of docs/source-sink-matrix.md --
+    # URL-named parameters, URL-named field reads, request-object members,
+    # and registered entry points (route decorators, tool registrations,
+    # dispatch methods, Tool-class entry methods).
+    pattern-sources:
+      # Sources (the contract lives in docs/source-sink-matrix.md). A source
+      # is any caller-shaped URL input: an explicit URL parameter, a
+      # URL-named field read off a config/request/payload object, a
+      # request-object member (query/body), or a parameter of a registered
+      # entry point (web route decorators, agent/tool registrations,
+      # dispatch methods, Tool-class entry methods). A tainted parameter
+      # stays tainted for the whole function body (parameter stickiness);
+      # the matrix doc covers the ceiling notes.
+      #
+      # URL-named parameters of any function or method, registered or not:
+      # `def fetch(url)` is an entry point for this analyzer.
+      - patterns:
+          - pattern: $ARG
+          - metavariable-regex:
+              metavariable: $ARG
+              regex: '(?i)^(url|uri|href|link|endpoint|callback_?url|callback|webhook_?url|webhook|jwks_?(uri|url)|avatar_?url|image_?url|feed_?url|target|host)(\W.*)?$'
+          - pattern-either:
+              - pattern-inside: |
+                  def $F(..., $ARG, ...):
+                    ...
+              - pattern-inside: |
+                  async def $F(..., $ARG, ...):
+                    ...
+      # Suffix forms: page_url, callbackUrl, feed_url, site_url, ...
+      # Case-sensitive camel halves keep `curl`-style names out.
+      - patterns:
+          - pattern: $ARG
+          - metavariable-regex:
+              metavariable: $ARG
+              regex: '^([a-z_0-9]+_(url|uri|href|endpoint|webhook)|[a-z_0-9]+(Url|Uri|Href|Endpoint|Webhook))(\W.*)?$'
+          - pattern-either:
+              - pattern-inside: |
+                  def $F(..., $ARG, ...):
+                    ...
+              - pattern-inside: |
+                  async def $F(..., $ARG, ...):
+                    ...
+      # URL-named attribute reads off any object (config objects, payload
+      # models, parsed request objects): cfg.webhook_url, options.url,
+      # request.url, ...
+      - patterns:
+          - pattern: $X.$F
+          - metavariable-regex:
+              metavariable: $F
+              regex: '(?i)^(url|uri|href|link|endpoint|callback_?url|webhook_?url|jwks_?(uri|url)|avatar_?url|image_?url|feed_?url|target|host)$'
+      # URL-named key reads: config["webhook_url"], payload.get("url"),
+      # request.args["target"], kwargs["feed_url"], ...
+      - patterns:
+          - pattern-either:
+              - pattern: $X[$K]
+              - pattern: $X.get($K, ...)
+          - metavariable-regex:
+              metavariable: $K
+              regex: >-
+                (?i)^["'](url|uri|href|link|endpoint|callback_?url|webhook_?url|jwks_?(uri|url)|avatar_?url|image_?url|feed_?url|target|host)["']$
+      # HTTP request-object members (Flask/Django/FastAPI/Starlette/aiohttp
+      # style): query/body member reads off a request receiver are
+      # caller-controlled. Receiver-gated so unrelated .data/.params
+      # attributes are not sources.
+      - patterns:
+          - pattern: $REQ.$F
+          - metavariable-regex:
+              metavariable: $REQ
+              regex: '(.*\.)?(request|req)$'
+          - metavariable-regex:
+              metavariable: $F
+              regex: '^(args|GET|POST|query_params|path_params|form|data|json|params|values|query|body)$'
+      # Route decorators: any parameter of a function registered via a web
+      # route/handler decorator (Flask/Bottle @app.route/@get,
+      # FastAPI/Starlette @router.get, Django REST @api_view/@action). The
+      # decorator method name is the signal, not the receiver.
+      - patterns:
+          - pattern: $ARG
+          - metavariable-regex:
+              metavariable: $DECO
+              regex: '(.*\.)?(route|api_route|get|post|put|delete|patch|head|options|websocket|add_url_rule|api_view|action)$'
+          - pattern-either:
+              - pattern-inside: |
+                  @$DECO(...)
+                  def $F(..., $ARG, ...):
+                    ...
+              - pattern-inside: |
+                  @$DECO(...)
+                  async def $F(..., $ARG, ...):
+                    ...
+              - pattern-inside: |
+                  @$DECO
+                  def $F(..., $ARG, ...):
+                    ...
+              - pattern-inside: |
+                  @$DECO
+                  async def $F(..., $ARG, ...):
+                    ...
+      # Agent/tool registrations (one entry family among several): any
+      # parameter of a function decorated as a tool entry point. The
+      # decorator method name is the signal, not the receiver, so FastMCP,
+      # low-level SDK servers, and vendored variants all match. A tainted
+      # `arguments` dict taints every value extracted from it
+      # (arguments["url"], arguments.get("url")).
+      - patterns:
+          - pattern: $ARG
+          # metavariable-regex is a full match on the bound text, so the
+          # receiver prefix must be spelled out.
+          - metavariable-regex:
+              metavariable: $DECO
+              regex: '(.*\.)?(tool|call_tool|get_prompt)'
+          - pattern-either:
+              - pattern-inside: |
+                  @$DECO(...)
+                  def $F(..., $ARG, ...):
+                    ...
+              - pattern-inside: |
+                  @$DECO(...)
+                  async def $F(..., $ARG, ...):
+                    ...
+              - pattern-inside: |
+                  @$DECO
+                  def $F(..., $ARG, ...):
+                    ...
+              - pattern-inside: |
+                  @$DECO
+                  async def $F(..., $ARG, ...):
+                    ...
+      # Dispatch-method source: a function or method named like a tool
+      # dispatcher whose parameters include args/params/request. Covers
+      # class-based registries where a registered callback delegates to
+      # `tool.execute(args)` and the sink lives in the method body.
+      - patterns:
+          - pattern: $ARG
+          - metavariable-regex:
+              metavariable: $ARG
+              regex: '^(args|arguments|params|request|input)(\W.*)?$'
+          - pattern-either:
+              - pattern-inside: |
+                  async def $M(..., $ARG, ...):
+                    ...
+              - pattern-inside: |
+                  def $M(..., $ARG, ...):
+                    ...
+          - metavariable-regex:
+              metavariable: $M
+              regex: '^(execute|handle|dispatch|process|invoke|run|call)[a-z_0-9]*$'
+      # Framework tool-entry source: agent frameworks that deliver
+      # caller-produced args through `Tool.forward`/`BaseTool._run`-style
+      # methods on Tool-named classes. The class-name bound keeps the
+      # method names from matching arbitrary helpers. First branch: named
+      # params. Second: **kwargs, which Semgrep binds separately as a
+      # ParamDict.
+      - patterns:
+          - pattern: $ARG
+          - pattern-either:
+              - pattern-inside: |
+                  class $T(...):
+                    ...
+                    async def $M($SELF, ..., $ARG, ...):
+                      ...
+              - pattern-inside: |
+                  class $T(...):
+                    ...
+                    def $M($SELF, ..., $ARG, ...):
+                      ...
+          - metavariable-regex:
+              metavariable: $T
+              regex: '(?i).*tool'
+          - metavariable-regex:
+              metavariable: $M
+              regex: '^(forward|_?run|_?arun|_?call|_?execute|invoke|process)[a-z_0-9]*$'
+          - metavariable-regex:
+              metavariable: $ARG
+              regex: '^(?!self$|cls$).*'
+      - patterns:
+          - pattern: $KW
+          - pattern-either:
+              - pattern-inside: |
+                  class $T(...):
+                    ...
+                    async def $M($SELF, ..., **$KW):
+                      ...
+              - pattern-inside: |
+                  class $T(...):
+                    ...
+                    def $M($SELF, ..., **$KW):
+                      ...
+          - metavariable-regex:
+              metavariable: $T
+              regex: '(?i).*tool'
+          - metavariable-regex:
+              metavariable: $M
+              regex: '^(forward|_?run|_?arun|_?call|_?execute|invoke|process)[a-z_0-9]*$'
+    # Sink: a tainted parse result's .scheme attribute read inside a scheme
+    # comparison or membership check. urlparse(url) / urlsplit(url) keep the
+    # result tainted, so `parsed = urlparse(url)` and `urlparse(url).scheme`
+    # both reach the sink. The focused metavariable is the parse result, not
+    # the literal collection.
+    pattern-sinks:
+      - patterns:
+          - pattern-either:
+              - pattern: $P.scheme in $C
+              - pattern: $P.scheme not in $C
+              - pattern: $P.scheme == $L
+              - pattern: $P.scheme != $L
+              - pattern: $P.scheme.startswith(...)
+          - focus-metavariable: $P
+          # Exclusions: a function that also resolves the host via DNS or
+          # parses it as an IP is more than scheme-only. Each not-inside
+          # entry lists one call; the deep-expression form covers calls
+          # nested in conditions, comprehensions, and assignments.
+          # metavariable-regex cannot constrain pattern-not-inside
+          # bindings, so resolver names are enumerated literally.
+          - pattern-not-inside: |
+              def $F(...):
+                ...
+                <... socket.getaddrinfo(...) ...>
+                ...
+          - pattern-not-inside: |
+              def $F(...):
+                ...
+                <... socket.gethostbyname(...) ...>
+                ...
+          - pattern-not-inside: |
+              def $F(...):
+                ...
+                <... socket.gethostbyname_ex(...) ...>
+                ...
+          - pattern-not-inside: |
+              def $F(...):
+                ...
+                <... socket.gethostbyaddr(...) ...>
+                ...
+          - pattern-not-inside: |
+              def $F(...):
+                ...
+                <... getaddrinfo(...) ...>
+                ...
+          - pattern-not-inside: |
+              def $F(...):
+                ...
+                <... gethostbyname(...) ...>
+                ...
+          - pattern-not-inside: |
+              def $F(...):
+                ...
+                <... ipaddress.$M(...) ...>
+                ...
+          # A hostname/netloc value fed to a check call or compared against
+          # a literal means the guard is more than scheme-only (G2 or a
+          # helper guard). Bare presence checks (`if not parsed.hostname`)
+          # do not match these shapes and stay in scope for G1.
+          - pattern-not-inside: |
+              def $F(...):
+                ...
+                <... $G($P.hostname, ...) ...>
+                ...
+          - pattern-not-inside: |
+              def $F(...):
+                ...
+                <... $G($P.netloc, ...) ...>
+                ...
+          - pattern-not-inside: |
+              def $F(...):
+                ...
+                <... $P.hostname == $L ...>
+                ...
+          - pattern-not-inside: |
+              def $F(...):
+                ...
+                <... $P.hostname != $L ...>
+                ...
+          - pattern-not-inside: |
+              def $F(...):
+                ...
+                <... $P.hostname in $C ...>
+                ...
+          - pattern-not-inside: |
+              def $F(...):
+                ...
+                <... $P.hostname not in $C ...>
+                ...
+          - pattern-not-inside: |
+              def $F(...):
+                ...
+                <... $P.hostname.startswith(...) ...>
+                ...
+          - pattern-not-inside: |
+              def $F(...):
+                ...
+                <... $P.hostname.endswith(...) ...>
+                ...

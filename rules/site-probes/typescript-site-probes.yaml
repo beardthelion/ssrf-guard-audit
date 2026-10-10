@@ -1,0 +1,338 @@
+rules:
+  # Site-enumerator and guard-shape probes for the layered site
+  # resolution. Search-mode rules: they mark locations, they do not issue
+  # verdicts. classify.py groups their hits by enclosing entry point (the
+  # site extent each handler_source match spans) and resolves each sink
+  # site per docs/source-sink-matrix.md.
+  #
+  # A site extent is any function that a source family can deliver a
+  # caller-shaped URL into: registered entry points (tool registrations,
+  # web framework route registrations, verb-named route handlers),
+  # functions with URL-named parameters, and functions containing
+  # URL-named member reads or request-object member reads.
+  - id: ssrf-guard-audit-probe-handler-source-typescript
+    message: >-
+      Site probe: entry-point candidate (source enumerator). Consumed by
+      the ssrf-guard-audit CLI site resolution; not a standalone finding.
+    severity: INFO
+    languages: [typescript, javascript]
+    metadata:
+      probe_role: handler_source
+      category: audit-probe
+      references:
+        - docs/source-sink-matrix.md
+    pattern-either:
+      # Agent/tool registration methods (one entry family among several).
+      # The match spans the whole registration call, so a sink inside an
+      # inline callback falls inside the site extent classify.py uses.
+      - patterns:
+          - pattern: $SRV.$REG(...)
+          - metavariable-regex:
+              metavariable: $REG
+              regex: '^(tool|registerTool|callTool|getPrompt|setRequestHandler|prompt|resource)$'
+      - patterns:
+          - pattern: $REG(...)
+          - metavariable-regex:
+              metavariable: $REG
+              regex: '^(tool|registerTool|callTool|getPrompt|setRequestHandler|prompt|resource)$'
+      # Web framework registrations carrying an inline callback:
+      # app.get('/x', (req) => { ... }), router.post('/x', async (req, res)
+      # => { ... }). Bounded to calls with a function argument so plain
+      # .get(key) lookups are not extents.
+      - patterns:
+          - pattern-either:
+              - pattern: $APP.$M(..., (..., $A, ...) => { ... })
+              - pattern: $APP.$M(..., async (..., $A, ...) => { ... })
+              - pattern: $APP.$M(..., function $H(...) { ... })
+              - pattern: $APP.$M(..., async function $H(...) { ... })
+          - metavariable-regex:
+              metavariable: $M
+              regex: '(?i)^(get|post|put|delete|del|patch|head|options|all|use|route|ws)$'
+      # Verb-named route handlers (Next.js style): export async function
+      # GET(request) { ... }
+      - patterns:
+          - pattern-either:
+              - pattern: |
+                  function $H(..., $ARG, ...) { ... }
+              - pattern: |
+                  async function $H(..., $ARG, ...) { ... }
+              - pattern: |
+                  const $H = async (..., $ARG, ...) => { ... }
+              - pattern: |
+                  const $H = (..., $ARG, ...) => { ... }
+          - metavariable-regex:
+              metavariable: $H
+              regex: '^(GET|POST|PUT|DELETE|PATCH|HEAD|OPTIONS)$'
+          - metavariable-regex:
+              metavariable: $ARG
+              regex: '^(req|request|ctx|event)(\W.*)?$'
+      # Dispatch-method extents: a method, function declaration, or
+      # object-literal callback named like a tool dispatcher that takes an
+      # args/params/request parameter. Covers class-based registries where
+      # a CallTool switch delegates to `tool.execute(args, ...)` and the
+      # sink lives inside the method body rather than the callback.
+      - patterns:
+          - pattern-either:
+              - pattern: |
+                  async $M(..., $ARG, ...) { ... }
+              - pattern: |
+                  $M(..., $ARG, ...) { ... }
+              - pattern: |
+                  async function $M(..., $ARG, ...) { ... }
+              - pattern: |
+                  function $M(..., $ARG, ...) { ... }
+              - pattern: |
+                  $M: async (..., $ARG, ...) => { ... }
+              - pattern: |
+                  $M: (..., $ARG, ...) => { ... }
+          - metavariable-regex:
+              metavariable: $M
+              regex: '^(execute|handle|dispatch|process|invoke|run|call)[a-zA-Z_0-9]*$'
+          - metavariable-regex:
+              metavariable: $ARG
+              regex: '^(args|arguments|params|request|input)(\W.*)?$'
+      # URL-named-parameter functions, methods, and arrows (exact names).
+      - patterns:
+          - pattern-either:
+              - pattern: |
+                  function $F(..., $ARG, ...) { ... }
+              - pattern: |
+                  async function $F(..., $ARG, ...) { ... }
+              - pattern: |
+                  $M(..., $ARG, ...) { ... }
+              - pattern: |
+                  async $M(..., $ARG, ...) { ... }
+              - pattern: |
+                  (..., $ARG, ...) => { ... }
+              - pattern: |
+                  async (..., $ARG, ...) => { ... }
+              - pattern: |
+                  (..., $ARG, ...) => $E
+              - pattern: |
+                  async (..., $ARG, ...) => $E
+          - metavariable-regex:
+              metavariable: $ARG
+              regex: '(?i)^(url|uri|href|link|endpoint|callback_?url|callback|webhook_?url|webhook|jwks_?(uri|url)|avatar_?url|image_?url|feed_?url|target|host)(\W.*)?$'
+      # URL-named-parameter functions (suffix forms: pageUrl, feed_url;
+      # camelCase halves case-sensitive so `curl`-style names stay out).
+      - patterns:
+          - pattern-either:
+              - pattern: |
+                  function $F(..., $ARG, ...) { ... }
+              - pattern: |
+                  async function $F(..., $ARG, ...) { ... }
+              - pattern: |
+                  $M(..., $ARG, ...) { ... }
+              - pattern: |
+                  async $M(..., $ARG, ...) { ... }
+              - pattern: |
+                  (..., $ARG, ...) => { ... }
+              - pattern: |
+                  async (..., $ARG, ...) => { ... }
+              - pattern: |
+                  (..., $ARG, ...) => $E
+              - pattern: |
+                  async (..., $ARG, ...) => $E
+          - metavariable-regex:
+              metavariable: $ARG
+              regex: '^([a-z_0-9]+_(url|uri|href|endpoint|webhook)|[a-z_0-9]+(Url|Uri|Href|Endpoint|Webhook))(\W.*)?$'
+      # Functions containing URL-named member reads or request-object
+      # member reads (config objects, payload objects, query/body fields).
+      # Member names here are broader than the taint source's
+      # receiver-gated list because an extent is only a bounding box.
+      - patterns:
+          - pattern-either:
+              - pattern: |
+                  function $F(...) {
+                    ...
+                    <... $X.$A ...>
+                    ...
+                  }
+              - pattern: |
+                  async function $F(...) {
+                    ...
+                    <... $X.$A ...>
+                    ...
+                  }
+              - pattern: |
+                  $M(...) {
+                    ...
+                    <... $X.$A ...>
+                    ...
+                  }
+              - pattern: |
+                  async $M(...) {
+                    ...
+                    <... $X.$A ...>
+                    ...
+                  }
+              - pattern: |
+                  (...) => {
+                    ...
+                    <... $X.$A ...>
+                    ...
+                  }
+              - pattern: |
+                  async (...) => {
+                    ...
+                    <... $X.$A ...>
+                    ...
+                  }
+          - metavariable-regex:
+              metavariable: $A
+              regex: '^(url|uri|href|link|endpoint|callback_?[Uu]rl|callback|webhook_?[Uu]rl|jwks_?(uri|url|Uri|Url)|avatar_?[Uu]rl|image_?[Uu]rl|feed_?[Uu]rl|target|host|args|GET|POST|query_params|path_params|form|data|json|params|param|querystring|nextUrl|searchParams|formData|values|query|body|request)$'
+      # Functions containing URL-named key reads: cfg["webhook_url"],
+      # searchParams.get("url").
+      - patterns:
+          - pattern-either:
+              - pattern: |
+                  function $F(...) {
+                    ...
+                    <... $X[$K] ...>
+                    ...
+                  }
+              - pattern: |
+                  async function $F(...) {
+                    ...
+                    <... $X[$K] ...>
+                    ...
+                  }
+              - pattern: |
+                  $M(...) {
+                    ...
+                    <... $X[$K] ...>
+                    ...
+                  }
+              - pattern: |
+                  async $M(...) {
+                    ...
+                    <... $X[$K] ...>
+                    ...
+                  }
+              - pattern: |
+                  (...) => {
+                    ...
+                    <... $X[$K] ...>
+                    ...
+                  }
+              - pattern: |
+                  async (...) => {
+                    ...
+                    <... $X[$K] ...>
+                    ...
+                  }
+              - pattern: |
+                  function $F(...) {
+                    ...
+                    <... $X.get($K, ...) ...>
+                    ...
+                  }
+              - pattern: |
+                  async function $F(...) {
+                    ...
+                    <... $X.get($K, ...) ...>
+                    ...
+                  }
+              - pattern: |
+                  $M(...) {
+                    ...
+                    <... $X.get($K, ...) ...>
+                    ...
+                  }
+              - pattern: |
+                  async $M(...) {
+                    ...
+                    <... $X.get($K, ...) ...>
+                    ...
+                  }
+              - pattern: |
+                  (...) => {
+                    ...
+                    <... $X.get($K, ...) ...>
+                    ...
+                  }
+              - pattern: |
+                  async (...) => {
+                    ...
+                    <... $X.get($K, ...) ...>
+                    ...
+                  }
+          - metavariable-regex:
+              metavariable: $K
+              regex: >-
+                (?i)^["'](url|uri|href|link|endpoint|callback_?url|webhook_?url|jwks_?(uri|url)|avatar_?url|image_?url|feed_?url|target|host)["']$
+
+  - id: ssrf-guard-audit-probe-network-sink-typescript
+    message: >-
+      Site probe: outbound request call (network-sink enumerator). Consumed
+      by the ssrf-guard-audit CLI site resolution; not a standalone finding.
+    severity: INFO
+    languages: [typescript, javascript]
+    metadata:
+      probe_role: network_sink
+      category: audit-probe
+      references:
+        - docs/source-sink-matrix.md
+    # Identical sink vocabulary to rules/typescript/g0-unguarded-fetch.yaml.
+    pattern-either:
+      - patterns:
+          - pattern: $F(...)
+          - metavariable-regex:
+              metavariable: $F
+              regex: '^(fetch|nodeFetch|got|axios|request)$'
+      - pattern: axios.$M(...)
+      - pattern: got.$M(...)
+      - patterns:
+          - pattern: $P.goto(...)
+          - metavariable-regex:
+              metavariable: $P
+              regex: '(?i).*(page|browser|ctx)[a-z_0-9]*'
+      - patterns:
+          - pattern: $C.request.$M(...)
+          - metavariable-regex:
+              metavariable: $M
+              regex: '^(get|post|put|delete|head|patch|options|request|stream)$'
+
+  - id: ssrf-guard-audit-probe-complete-guard-typescript
+    message: >-
+      Site probe: recognized complete-guard call shape (resolve-all + range
+      check + pinned connect wrapper, recognized by callee name). Consumed
+      by the ssrf-guard-audit CLI site resolution; not a standalone finding.
+    severity: INFO
+    languages: [typescript, javascript]
+    metadata:
+      probe_role: complete_guard
+      category: audit-probe
+      references:
+        - docs/source-sink-matrix.md
+    patterns:
+      - pattern: $GUARD(...)
+      - metavariable-regex:
+          metavariable: $GUARD
+          regex: '(?i)((.*[._])?(ssrf|safe_?fetch|safe_?get|safe_?request|assert_?safe|ensure_?public|require_?public)|.*(public_?url|resolve_?and_?pin|pinned_?request))[a-z_0-9]*'
+
+  - id: ssrf-guard-audit-probe-intervening-validation-typescript
+    message: >-
+      Site probe: bounded intervening call or check-and-throw whose shape
+      reads as validation. Consumed by the ssrf-guard-audit CLI site
+      resolution; a hit with no higher-precedence match resolves the site
+      to "guard detected, shape unrecognized, manual review".
+    severity: INFO
+    languages: [typescript, javascript]
+    metadata:
+      probe_role: intervening_validation
+      category: audit-probe
+      references:
+        - docs/source-sink-matrix.md
+    pattern-either:
+      - patterns:
+          - pattern: $CALL(...)
+          - metavariable-regex:
+              metavariable: $CALL
+              regex: '(?i).*(valid|check|verif|assert|is_?safe|is_?allowed|is_?ip|ensure|saniti[sz]e|guard|allow|block|deny|filter|resolv|inspect|secure|protect|private|internal|ip_?addr|host_?name)[a-z_0-9]*'
+      - pattern: |
+          if ($COND) {
+            ...
+            throw $E;
+            ...
+          }

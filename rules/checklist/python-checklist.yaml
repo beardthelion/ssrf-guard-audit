@@ -1,0 +1,155 @@
+rules:
+  # Checklist-tier candidate enumerators for the structural classes.
+  # These rules emit candidate sites to verify manually; they never
+  # emit a verdict. classify.py turns each hit into a checklist item and
+  # only prints the checklist when an SSRF-relevant surface was detected.
+  - id: ssrf-guard-audit-checklist-g7-python
+    message: >-
+      G7 checklist candidate: DNS resolution site. Verify the outbound
+      request connects to the address that was resolved and validated
+      (connect-time pinning), not to a fresh DNS answer.
+    severity: INFO
+    languages: [python]
+    metadata:
+      guard_class: G7
+      tier: checklist
+      probe_role: checklist
+      verify: >-
+        connect-time pinning: the fetch must connect to the validated
+        resolved address, not re-resolve the hostname
+      category: security
+      references:
+        - docs/source-sink-matrix.md
+    # Enumerates resolver calls. Search mode cannot express
+    # resolve-validate-then-discard, so every resolve site is a candidate;
+    # correct pinned-connect guards appear alongside vulnerable ones.
+    patterns:
+      - pattern-either:
+          - patterns:
+              - pattern: $R.$M(...)
+              - metavariable-regex:
+                  metavariable: $R
+                  regex: '(?i).*(socket|dns|resolver|nameserver|loop)[a-z_0-9.]*'
+              - metavariable-regex:
+                  metavariable: $M
+                  regex: '(?i)^(getaddrinfo|gethostbyname|gethostbyname_ex|gethostbyaddr|resolve[a-z_0-9]*|lookup|query)$'
+          - patterns:
+              - pattern: $F(...)
+              - metavariable-regex:
+                  metavariable: $F
+                  regex: '(?i)^(getaddrinfo|gethostbyname|gethostbyname_ex|gethostbyaddr)$'
+
+  - id: ssrf-guard-audit-checklist-g9-python
+    message: >-
+      G9 checklist candidate: registered entry point. Verify every network
+      sink reachable from this entry point goes through a complete guard,
+      and that no second entry point reaches the same sinks unguarded.
+    severity: INFO
+    languages: [python]
+    metadata:
+      guard_class: G9
+      tier: checklist
+      probe_role: checklist
+      verify: >-
+        guard coverage across entry points: every path from this entry
+        point to a network sink shares the same complete guard
+      category: security
+      references:
+        - docs/source-sink-matrix.md
+    # Registered entry points only (decorated routes and tool entries,
+    # dispatch methods, Tool-class entry methods). Plain URL-parameter
+    # functions are still site extents for the layered resolution but are
+    # deliberately not enumerated here: a "verify every entry" checklist
+    # listing every `def f(url)` in a repo would be noise.
+    pattern-either:
+      - patterns:
+          - metavariable-regex:
+              metavariable: $DECO
+              regex: '(.*\.)?(tool|call_tool|get_prompt|route|api_route|get|post|put|delete|patch|head|options|websocket|add_url_rule|api_view|action)$'
+          - pattern-either:
+              - pattern: |
+                  @$DECO(...)
+                  def $F(...):
+                    ...
+              - pattern: |
+                  @$DECO(...)
+                  async def $F(...):
+                    ...
+              - pattern: |
+                  @$DECO
+                  def $F(...):
+                    ...
+              - pattern: |
+                  @$DECO
+                  async def $F(...):
+                    ...
+      - patterns:
+          - pattern-either:
+              - pattern: |
+                  async def $M(..., $ARG, ...):
+                    ...
+              - pattern: |
+                  def $M(..., $ARG, ...):
+                    ...
+          - metavariable-regex:
+              metavariable: $M
+              regex: '^(execute|handle|dispatch|process|invoke|run|call)[a-z_0-9]*$'
+          - metavariable-regex:
+              metavariable: $ARG
+              regex: '^(args|arguments|params|request|input)(\W.*)?$'
+      - patterns:
+          - pattern-inside: |
+              class $T(...):
+                ...
+          - metavariable-regex:
+              metavariable: $T
+              regex: '(?i).*tool'
+          - pattern-either:
+              - pattern: |
+                  async def $M(...):
+                    ...
+              - pattern: |
+                  def $M(...):
+                    ...
+          - metavariable-regex:
+              metavariable: $M
+              regex: '^(forward|_?run|_?arun|_?call|_?execute|invoke|process)[a-z_0-9]*$'
+
+  - id: ssrf-guard-audit-checklist-g10-python
+    message: >-
+      G10 checklist candidate: credential or auth-header attachment. Verify
+      the request host is not caller-chosen; a token sent to a
+      caller-selected URL leaks it.
+    severity: INFO
+    languages: [python]
+    metadata:
+      guard_class: G10
+      tier: checklist
+      probe_role: checklist
+      verify: >-
+        credential attachment: headers, auth kwargs, and credential dict
+        keys must not follow a caller-chosen host
+      category: security
+      references:
+        - docs/source-sink-matrix.md
+    pattern-either:
+      # Call carrying a headers=/auth=/credential-ish keyword argument.
+      - patterns:
+          - pattern: $F(..., $KW=$V, ...)
+          - metavariable-regex:
+              metavariable: $KW
+              regex: '(?i)^(headers?|auth|authorization|credentials?|api_?key|access_?token|bearer_?token)$'
+      # Dict literal carrying a credential-ish string key.
+      - patterns:
+          - pattern: '{$KEY: $V, ...}'
+          - metavariable-regex:
+              metavariable: $KEY
+              regex: >-
+                (?i)["'][^"']*(authorization|api[-_]?key|x-api-key|access[-_]?token|auth[-_]?token|bearer|secret|credential)[^"']*["']
+      # Subscript assignment of a credential-ish header.
+      - patterns:
+          - pattern: $H[$KEY] = $V
+          - metavariable-regex:
+              metavariable: $KEY
+              regex: >-
+                (?i)["'][^"']*(authorization|api[-_]?key|x-api-key|access[-_]?token|auth[-_]?token|bearer|secret|credential)[^"']*["']

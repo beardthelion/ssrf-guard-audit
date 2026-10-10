@@ -1,0 +1,351 @@
+rules:
+  - id: ssrf-guard-audit-g8-python
+    mode: taint
+    message: >-
+      Caller-shaped URL input reaches an unanchored allowlist check: a
+      prefix (startswith), suffix (endswith), substring (in), or regex
+      (re.match without an end anchor, re.search) test on the tainted
+      URL/host (G8: weak allowlist). "https://api.example.com" prefix-
+      matches "https://api.example.com.evil.example", endswith("example.com")
+      matches "notexample.com", and an unanchored regex matches anywhere in
+      the string.
+    severity: ERROR
+    languages: [python]
+    metadata:
+      category: security
+      subcategory: [audit]
+      guard_class: G8
+      cwe:
+        - "CWE-918: Server-Side Request Forgery (SSRF)"
+      confidence: MEDIUM
+      likelihood: MEDIUM
+      impact: HIGH
+      technology: [ssrf, python]
+      advisory_refs:
+        - "shape reference: an allowlist that uses url.startswith(pattern) for '://'-patterns and bare host equality otherwise (no public advisory)"
+      references:
+        - docs/source-sink-matrix.md
+    # Sources: the entry-point vocabulary of docs/source-sink-matrix.md --
+    # URL-named parameters, URL-named field reads, request-object members,
+    # and registered entry points (route decorators, tool registrations,
+    # dispatch methods, Tool-class entry methods).
+    pattern-sources:
+      # Sources (the contract lives in docs/source-sink-matrix.md). A source
+      # is any caller-shaped URL input: an explicit URL parameter, a
+      # URL-named field read off a config/request/payload object, a
+      # request-object member (query/body), or a parameter of a registered
+      # entry point (web route decorators, agent/tool registrations,
+      # dispatch methods, Tool-class entry methods). A tainted parameter
+      # stays tainted for the whole function body (parameter stickiness);
+      # the matrix doc covers the ceiling notes.
+      #
+      # URL-named parameters of any function or method, registered or not:
+      # `def fetch(url)` is an entry point for this analyzer.
+      - patterns:
+          - pattern: $ARG
+          - metavariable-regex:
+              metavariable: $ARG
+              regex: '(?i)^(url|uri|href|link|endpoint|callback_?url|callback|webhook_?url|webhook|jwks_?(uri|url)|avatar_?url|image_?url|feed_?url|target|host)(\W.*)?$'
+          - pattern-either:
+              - pattern-inside: |
+                  def $F(..., $ARG, ...):
+                    ...
+              - pattern-inside: |
+                  async def $F(..., $ARG, ...):
+                    ...
+      # Suffix forms: page_url, callbackUrl, feed_url, site_url, ...
+      # Case-sensitive camel halves keep `curl`-style names out.
+      - patterns:
+          - pattern: $ARG
+          - metavariable-regex:
+              metavariable: $ARG
+              regex: '^([a-z_0-9]+_(url|uri|href|endpoint|webhook)|[a-z_0-9]+(Url|Uri|Href|Endpoint|Webhook))(\W.*)?$'
+          - pattern-either:
+              - pattern-inside: |
+                  def $F(..., $ARG, ...):
+                    ...
+              - pattern-inside: |
+                  async def $F(..., $ARG, ...):
+                    ...
+      # URL-named attribute reads off any object (config objects, payload
+      # models, parsed request objects): cfg.webhook_url, options.url,
+      # request.url, ...
+      - patterns:
+          - pattern: $X.$F
+          - metavariable-regex:
+              metavariable: $F
+              regex: '(?i)^(url|uri|href|link|endpoint|callback_?url|webhook_?url|jwks_?(uri|url)|avatar_?url|image_?url|feed_?url|target|host)$'
+      # URL-named key reads: config["webhook_url"], payload.get("url"),
+      # request.args["target"], kwargs["feed_url"], ...
+      - patterns:
+          - pattern-either:
+              - pattern: $X[$K]
+              - pattern: $X.get($K, ...)
+          - metavariable-regex:
+              metavariable: $K
+              regex: >-
+                (?i)^["'](url|uri|href|link|endpoint|callback_?url|webhook_?url|jwks_?(uri|url)|avatar_?url|image_?url|feed_?url|target|host)["']$
+      # HTTP request-object members (Flask/Django/FastAPI/Starlette/aiohttp
+      # style): query/body member reads off a request receiver are
+      # caller-controlled. Receiver-gated so unrelated .data/.params
+      # attributes are not sources.
+      - patterns:
+          - pattern: $REQ.$F
+          - metavariable-regex:
+              metavariable: $REQ
+              regex: '(.*\.)?(request|req)$'
+          - metavariable-regex:
+              metavariable: $F
+              regex: '^(args|GET|POST|query_params|path_params|form|data|json|params|values|query|body)$'
+      # Route decorators: any parameter of a function registered via a web
+      # route/handler decorator (Flask/Bottle @app.route/@get,
+      # FastAPI/Starlette @router.get, Django REST @api_view/@action). The
+      # decorator method name is the signal, not the receiver.
+      - patterns:
+          - pattern: $ARG
+          - metavariable-regex:
+              metavariable: $DECO
+              regex: '(.*\.)?(route|api_route|get|post|put|delete|patch|head|options|websocket|add_url_rule|api_view|action)$'
+          - pattern-either:
+              - pattern-inside: |
+                  @$DECO(...)
+                  def $F(..., $ARG, ...):
+                    ...
+              - pattern-inside: |
+                  @$DECO(...)
+                  async def $F(..., $ARG, ...):
+                    ...
+              - pattern-inside: |
+                  @$DECO
+                  def $F(..., $ARG, ...):
+                    ...
+              - pattern-inside: |
+                  @$DECO
+                  async def $F(..., $ARG, ...):
+                    ...
+      # Agent/tool registrations (one entry family among several): any
+      # parameter of a function decorated as a tool entry point. The
+      # decorator method name is the signal, not the receiver, so FastMCP,
+      # low-level SDK servers, and vendored variants all match. A tainted
+      # `arguments` dict taints every value extracted from it
+      # (arguments["url"], arguments.get("url")).
+      - patterns:
+          - pattern: $ARG
+          # metavariable-regex is a full match on the bound text, so the
+          # receiver prefix must be spelled out.
+          - metavariable-regex:
+              metavariable: $DECO
+              regex: '(.*\.)?(tool|call_tool|get_prompt)'
+          - pattern-either:
+              - pattern-inside: |
+                  @$DECO(...)
+                  def $F(..., $ARG, ...):
+                    ...
+              - pattern-inside: |
+                  @$DECO(...)
+                  async def $F(..., $ARG, ...):
+                    ...
+              - pattern-inside: |
+                  @$DECO
+                  def $F(..., $ARG, ...):
+                    ...
+              - pattern-inside: |
+                  @$DECO
+                  async def $F(..., $ARG, ...):
+                    ...
+      # Dispatch-method source: a function or method named like a tool
+      # dispatcher whose parameters include args/params/request. Covers
+      # class-based registries where a registered callback delegates to
+      # `tool.execute(args)` and the sink lives in the method body.
+      - patterns:
+          - pattern: $ARG
+          - metavariable-regex:
+              metavariable: $ARG
+              regex: '^(args|arguments|params|request|input)(\W.*)?$'
+          - pattern-either:
+              - pattern-inside: |
+                  async def $M(..., $ARG, ...):
+                    ...
+              - pattern-inside: |
+                  def $M(..., $ARG, ...):
+                    ...
+          - metavariable-regex:
+              metavariable: $M
+              regex: '^(execute|handle|dispatch|process|invoke|run|call)[a-z_0-9]*$'
+      # Framework tool-entry source: agent frameworks that deliver
+      # caller-produced args through `Tool.forward`/`BaseTool._run`-style
+      # methods on Tool-named classes. The class-name bound keeps the
+      # method names from matching arbitrary helpers. First branch: named
+      # params. Second: **kwargs, which Semgrep binds separately as a
+      # ParamDict.
+      - patterns:
+          - pattern: $ARG
+          - pattern-either:
+              - pattern-inside: |
+                  class $T(...):
+                    ...
+                    async def $M($SELF, ..., $ARG, ...):
+                      ...
+              - pattern-inside: |
+                  class $T(...):
+                    ...
+                    def $M($SELF, ..., $ARG, ...):
+                      ...
+          - metavariable-regex:
+              metavariable: $T
+              regex: '(?i).*tool'
+          - metavariable-regex:
+              metavariable: $M
+              regex: '^(forward|_?run|_?arun|_?call|_?execute|invoke|process)[a-z_0-9]*$'
+          - metavariable-regex:
+              metavariable: $ARG
+              regex: '^(?!self$|cls$).*'
+      - patterns:
+          - pattern: $KW
+          - pattern-either:
+              - pattern-inside: |
+                  class $T(...):
+                    ...
+                    async def $M($SELF, ..., **$KW):
+                      ...
+              - pattern-inside: |
+                  class $T(...):
+                    ...
+                    def $M($SELF, ..., **$KW):
+                      ...
+          - metavariable-regex:
+              metavariable: $T
+              regex: '(?i).*tool'
+          - metavariable-regex:
+              metavariable: $M
+              regex: '^(forward|_?run|_?arun|_?call|_?execute|invoke|process)[a-z_0-9]*$'
+    # Sinks: unanchored textual checks on the tainted URL/host.
+    pattern-sinks:
+      # Prefix or suffix test: matches "example.com.evil" style bypasses.
+      - patterns:
+          - pattern-either:
+              - pattern: $X.startswith($L)
+              - pattern: $X.endswith($L)
+          - focus-metavariable: $X
+      # Substring containment of a literal inside the tainted value:
+      # "example.com" in url matches "https://evil.example/?q=example.com".
+      - patterns:
+          - pattern: $L in $X
+          - focus-metavariable: $X
+          - metavariable-regex:
+              metavariable: $L
+              regex: '[a-zA-Z]*["''].*["'']'
+      # re.match anchors at the start implicitly; the weak shape is a
+      # pattern literal without an end anchor ($ or \Z before the closing
+      # quote). metavariable-regex is a full match on the bound literal
+      # text including its quotes; [^$zZ] excludes both anchor spellings
+      # (semgrep 1.177 has no metavariable-not-regex).
+      - patterns:
+          - pattern: re.match($P, $X, ...)
+          - focus-metavariable: $X
+          - metavariable-regex:
+              metavariable: $P
+              regex: '[a-zA-Z]*["''].*[^$zZ]["'']'
+      # re.search is unanchored at both ends; using it as a host check is
+      # never anchored.
+      - patterns:
+          - pattern-either:
+              - pattern: re.search($P, $X, ...)
+              - pattern: re.findall($P, $X, ...)
+          - focus-metavariable: $X
+  - id: ssrf-guard-audit-g8-python-env-killswitch
+    message: >-
+      An environment variable whose name reads as a guard bypass
+      (ALLOW_LOCAL_*, ALLOW_PRIVATE*, DISABLE_SSRF*, BYPASS*, SKIP_*,
+      UNSAFE/INSECURE/DANGEROUS) is read here (G8: env kill-switch). When it
+      gates an SSRF check the guard is an operator-set flag, not a control;
+      verify the flag cannot disable validation on caller-supplied input.
+    severity: WARNING
+    languages: [python]
+    metadata:
+      category: security
+      subcategory: [audit]
+      guard_class: G8
+      cwe:
+        - "CWE-918: Server-Side Request Forgery (SSRF)"
+      confidence: MEDIUM
+      likelihood: LOW
+      impact: MEDIUM
+      technology: [ssrf, python]
+      advisory_refs:
+        - "CVE-2026-55525 / GHSA-5r34-2g38-6569 (MervinPraison/PraisonAI ALLOW_LOCAL_CRAWL env var skips SSRF validation in web_crawl)"
+        - "CVE-2026-49857 / GHSA-pvrj-8cg3-j5f8 (ymw0407/auth-fetch-mcp AUTH_FETCH_ALLOW_PRIVATE env kill-switch, present in both vulnerable and patched states)"
+      references:
+        - docs/source-sink-matrix.md
+    # Search mode: the env read is the finding; no taint involved. The
+    # variable name must be a string literal matching bypass vocabulary, so
+    # config-indirect reads like os.getenv(cookies["value"]) do not fire.
+    patterns:
+      - pattern-either:
+          - pattern: os.environ.get($V, ...)
+          - pattern: os.getenv($V, ...)
+          - pattern: os.environ[$V]
+      - metavariable-regex:
+          metavariable: $V
+          regex: '(?i)[a-z]*["''][A-Z0-9_]*(SSRF|ALLOW_?(LOCAL|PRIVATE|INTERNAL|ALL|ANY)|LOCAL_?CRAWL|DISABLE_?(SSRF|SECUR|GUARD|CHECK|VALID|FETCH)|BYPASS|SKIP_?(SSRF|GUARD|CHECK|VALID)|UNSAFE|INSECURE|DANGEROUS|NO_?(SSRF|GUARD|CHECK|VALID))[A-Z0-9_]*["'']'
+  - id: ssrf-guard-audit-g8-python-default-off
+    message: >-
+      An allowlist/blocklist-shaped name (allow*, permit*, block*, deny*,
+      prohibit*, whitelist) is declared with an empty or off default
+      (None, [], False, Field(default=...)) (G8: guard off by default).
+      a tool can ship an allowed_domains-style list defaulting to None, which makes the
+      guard a no-op until an operator opts in.
+    severity: WARNING
+    languages: [python]
+    metadata:
+      category: security
+      subcategory: [audit]
+      guard_class: G8
+      cwe:
+        - "CWE-918: Server-Side Request Forgery (SSRF)"
+      confidence: MEDIUM
+      likelihood: LOW
+      impact: MEDIUM
+      technology: [ssrf, python]
+      advisory_refs:
+        - "shape reference: allowlist/blocklist fields defaulting to None/False so the guard returns True for everything (no public advisory)"
+        - "shape reference: a requests tool requiring an explicit dangerous-requests opt-in rather than guarding by default (no public advisory)"
+      references:
+        - docs/source-sink-matrix.md
+    # Search mode: the declaration is the finding. metavariable-regex is a
+    # full match on the bound name; (.*[._])? covers self.allowed_domains
+    # and config.allowed_hosts attribute targets.
+    pattern-either:
+      - patterns:
+          - pattern-either:
+              - pattern: $A = None
+              - pattern: $A = []
+              - pattern: |
+                  $A: $T = None
+              - pattern: |
+                  $A: $T = []
+          - metavariable-regex:
+              metavariable: $A
+              regex: '(?i)(.*[._])?[a-z_0-9]*(allow|white_?list|permit|block|deny|prohibit)[a-z_0-9]*'
+      - patterns:
+          - pattern-either:
+              - pattern: $A = Field(..., default=$D, ...)
+              - pattern: |
+                  $A: $T = Field(..., default=$D, ...)
+          - metavariable-regex:
+              metavariable: $A
+              regex: '(?i)(.*[._])?[a-z_0-9]*(allow|white_?list|permit|block|deny|prohibit)[a-z_0-9]*'
+          - metavariable-regex:
+              metavariable: $D
+              regex: '(None|False|\[\]|\{\}|set\(\)|dict\(\)|list\(\))'
+      - patterns:
+          - pattern-either:
+              - pattern: |
+                  def $F(..., $A=None, ...):
+                    ...
+              - pattern: |
+                  def $F(..., $A=[], ...):
+                    ...
+          - metavariable-regex:
+              metavariable: $A
+              regex: '(?i)[a-z_0-9]*(allow|white_?list|permit|block|deny|prohibit)[a-z_0-9]*'

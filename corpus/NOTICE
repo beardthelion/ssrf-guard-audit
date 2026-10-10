@@ -1,0 +1,63 @@
+Corpus attribution
+
+Each corpus instance lists its upstream repository, license, and advisory
+references in its own metadata.json. This NOTICE summarizes the vendored
+instances; fetched instances (materialized under corpus/_fetched/ at a
+pinned commit by scripts/fetch_corpus.py) are not vendored here.
+
+Vendored instances (verbatim source snapshots at the pinned SHAs in
+metadata.json, redistributed under their upstream licenses):
+
+- modelcontextprotocol/servers (src/fetch MCP server)
+  License: MIT OR Apache-2.0 (upstream license transition in progress)
+  Instance: g0-mcp-server-fetch
+
+- jae-jae/fetcher-mcp
+  License: MIT
+  Instance: g1-fetcher-mcp-scheme-only
+
+- MervinPraison/PraisonAI (praisonaiagents package)
+  License: MIT
+  Instances: g3-praisonaiagents-spider-hostname,
+             g6-praisonaiagents-web-crawl-redirect
+
+- kazuph/mcp-fetch
+  License: MIT
+  Instance: g4-kazuph-mcp-fetch-bracketed-ipv6
+
+- Aas-ee/open-webSearch
+  License: Apache-2.0
+  Instance: g4-open-websearch-bracketed-ipv6
+
+- ymw0407/auth-fetch-mcp
+  License: MIT
+  Instance: g5-auth-fetch-mcp-ipv6-normalization
+
+- sooperset/mcp-atlassian
+  License: MIT
+  Instance: checklist-mcp-atlassian-g7
+
+- crewAIInc/crewAI (crewai-tools package)
+  License: MIT
+  Instance: clean-crewai-scrape-website-tool
+
+- zcaceres/fetch-mcp
+  License: MIT
+  Instance: clean-zcaceres-fetch-mcp
+
+- frappe/frappe (webhook doctype)
+  License: MIT
+  Instance: g0-frappe-webhook-dispatch
+
+- Mintplex-Labs/anything-llm (collector URL validation)
+  License: MIT
+  Instance: g1-anythingllm-url-validation
+
+- gptme/gptme (browser tool)
+  License: MIT
+  Instance: g6-gptme-browser-playwright
+
+Fetched-only instances (not vendored; see each metadata.json):
+
+- kazuph/mcp-fetch HEAD snapshot (MIT)
+- firecrawl/firecrawl safeFetch.ts (AGPL-3.0)
