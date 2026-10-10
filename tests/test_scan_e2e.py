@@ -120,7 +120,7 @@ def test_scan_dispatch_method_reports_class(capsys):
 def test_scan_sink_outside_handler_in_coverage(capsys):
     # The fixture's sink lives in a non-entry function; it must land
     # on the coverage line, not read as a guarded or empty scan.
-    code = main(["scan", str(FIXTURES / "cli" / "sink-outside-handler")])
+    code = main(["scan", str(FIXTURES / "cli" / "sink-outside-entry")])
     out = capsys.readouterr().out
     assert "outside recognized entries" in out
     assert "helper.py" in out
