@@ -26,22 +26,41 @@ who need to know how a URL guard is incomplete, not only that one exists.
 
 ## Install and run
 
+Not published to PyPI. Run it straight from GitHub:
+
 ```sh
-uvx ssrf-guard-audit scan /path/to/cloned/repo
+uvx --from git+https://github.com/beardthelion/ssrf-guard-audit ssrf-guard-audit scan /path/to/cloned/repo
 ```
 
-or install first and keep the entry point:
+or install it and keep the entry point:
 
 ```sh
-pipx install ssrf-guard-audit
+pipx install git+https://github.com/beardthelion/ssrf-guard-audit
 ssrf-guard-audit scan /path/to/cloned/repo
 ```
 
 From a source checkout:
 
 ```sh
+git clone https://github.com/beardthelion/ssrf-guard-audit
+cd ssrf-guard-audit
 pipx install .
 ssrf-guard-audit scan /path/to/cloned/repo
+```
+
+Example on a corpus instance (Semgrep's own progress banner goes to stderr):
+
+```
+$ ssrf-guard-audit scan corpus/g1-fetcher-mcp-scheme-only
+ssrf-guard-audit 0.1.0 scan of corpus/g1-fetcher-mcp-scheme-only (semgrep 1.177.0)
+
+Deterministic findings
+----------------------
+  [G1] scheme-only validation
+    corpus/g1-fetcher-mcp-scheme-only/vulnerable/src/utils/urlValidator.ts:25-56  (export function validateUrlProtocol(url: string): string {)
+      guard: corpus/g1-fetcher-mcp-scheme-only/vulnerable/src/utils/urlValidator.ts:45
+  [G6] missing redirect re-validation
+...
 ```
 
 `scan` flags: `--json` (versioned machine output), `--timeout SECONDS`
@@ -133,8 +152,8 @@ detection boundary; every rule cites it.
 
 ## Consumption modes
 
-- CLI (above): `uvx ssrf-guard-audit scan <repo>`, or `pipx install .` from a
-  checkout. The wheel force-includes `rules/`, so the installed entry point
+- CLI (above): `uvx --from git+https://github.com/beardthelion/ssrf-guard-audit
+  ssrf-guard-audit scan <repo>`, or `pipx install .` from a checkout. The wheel force-includes `rules/`, so the installed entry point
   needs no extra rule configuration.
 - Raw rule pack from a checkout: `semgrep --config rules/ <repo>` or
   `semgrep scan --config rules/ --json <repo>`. Note the caveat under
@@ -244,6 +263,17 @@ test rules/` (the co-located `ruleid:`/`ok:` fixtures are the executable
 contract for the matrix), `pytest`, and a check that nothing under
 `corpus/` is collected, across the pinned Semgrep floor and latest. It also
 builds the `dist/ssrf-guard-audit.yaml` bundle.
+
+Local run: `pip install -e '.[test]' && pytest -q`, and
+`ssrf-guard-audit corpus-validate` for the corpus gate.
+
+## Related tools
+
+- [mcp-ssrf-audit](https://github.com/beardthelion/mcp-ssrf-audit): the same taxonomy scoped to MCP tool handlers
+- [path-guard-audit](https://github.com/beardthelion/path-guard-audit): guard completeness for filesystem and archive path checks
+- [dyetrace](https://github.com/beardthelion/dyetrace): reads this tool's `--json` output and proves candidates at runtime with `dyetrace egress`
+- [egress-plane](https://github.com/beardthelion/egress-plane): inventory of every outbound route in a repo
+- [cve-variant-sweep](https://github.com/beardthelion/cve-variant-sweep): turns guard-adding CVE fixes into Semgrep rules
 
 ## License
 
