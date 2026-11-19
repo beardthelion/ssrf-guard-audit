@@ -37,17 +37,9 @@ metadata.json, redistributed under their upstream licenses):
   License: MIT
   Instance: checklist-mcp-atlassian-g7
 
-- crewAIInc/crewAI (crewai-tools package)
-  License: MIT
-  Instance: clean-crewai-scrape-website-tool
-
 - zcaceres/fetch-mcp
   License: MIT
   Instance: g6-zcaceres-fetch-mcp-redirect
-
-- huggingface/smolagents (default_tools.py)
-  License: Apache-2.0
-  Instance: g0-smolagents-visit-webpage
 
 - louislam/uptime-kuma (real-browser monitor type, webhook notification provider)
   License: MIT

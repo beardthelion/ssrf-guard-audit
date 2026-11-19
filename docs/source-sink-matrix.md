@@ -221,12 +221,11 @@ than papered over:
   to a transport object is invisible at the call site: a
   `requests.Session` mounted with an SSRF adapter (linkding's
   `GuardedHTTPAdapter` resolves, range-checks, and connects per redirect
-  hop), or a session built by a guard factory (crewAI's
-  `safe_requests`/adapter pattern), makes `http_client.get(url)` look
+  hop), or a session built by a guard factory (a `safe_requests`
+  helper returning an adapter-mounted session), makes `http_client.get(url)` look
   unguarded to lexical analysis. The deterministic class still fires at
   the call site. Do not treat those hits as unguarded; they are the
-  ceiling this analyzer cannot see past, the same shape the corpus's
-  `g8-crewai-ssrf-adapter-escape-hatch` instance documents.
+  ceiling this analyzer cannot see past.
 - Parameter stickiness. A source parameter stays tainted for the whole
   function body: reassigning it (`url = "literal"`) or check-and-throwing on
   it directly (`assert_public_url(url)` then `requests.get(url)`) does not

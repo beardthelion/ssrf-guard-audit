@@ -240,12 +240,9 @@ labels give the pinned SHA (8 chars) and expected class set. Full detail lives i
 | g6-praisonaiagents-web-crawl-redirect | MervinPraison/PraisonAI | vuln 9991e00f (G6+G8); patched 2f9677ab (G6+G8) | CVE-2026-55525, CVE-2026-55523, CVE-2026-55524 | MIT | vendored |
 | checklist-mcp-atlassian-g7 | sooperset/mcp-atlassian | vuln 52b9b099 (G7); patched 5cd697df (G7) | CVE-2026-27826 / GHSA-7r34-79r5-rcc9 | MIT | vendored |
 | g6-zcaceres-fetch-mcp-redirect | zcaceres/fetch-mcp | guarded 1ddb1a59 (G6; fetch follows redirects, `response.url` re-check runs after the hop connects) | none | MIT | vendored |
-| clean-crewai-scrape-website-tool | crewAIInc/crewAI | guarded 894898f8 (CLEAN; caller slice only) | none | MIT | vendored |
 | g0-frappe-webhook-dispatch | frappe/frappe | vuln e8bc81e6 (G0) | none | MIT | vendored |
 | g1-anythingllm-url-validation | Mintplex-Labs/anything-llm | vuln 2a10d052 (G1) | none | MIT | vendored |
 | g6-gptme-browser-playwright | gptme/gptme | vuln 292f8a5b (G6) | issue 1021 | MIT | vendored |
-| g8-crewai-ssrf-adapter-escape-hatch | crewAIInc/crewAI | vuln 894898f8 (G6+G8) | none | MIT | vendored |
-| g0-smolagents-visit-webpage | huggingface/smolagents | vuln 96f33faa (G0+G8) | issue 2081 | Apache-2.0 | vendored |
 | g1-uptime-kuma-browser-monitor | louislam/uptime-kuma | vuln b61b322c (G1+G6+G8; loopback-verified `page.goto` on monitor URL) | GHSA-2qgm (scheme check only) | MIT | vendored |
 | clean-firecrawl-safe-fetch | firecrawl/firecrawl | fetched b3cc08da (CLEAN) | none | AGPL-3.0 | fetched |
 

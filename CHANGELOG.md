@@ -7,6 +7,10 @@ Semantic Versioning.
 
 ## [Unreleased]
 
+### Removed
+
+- 3 third-party corpus instances withdrawn from the labeled corpus.
+
 ### Fixed
 
 - TypeScript/JavaScript taint sources now cover URL-named fields
@@ -20,10 +24,7 @@ Semantic Versioning.
 
 ### Added
 
-- Corpus: `g0-smolagents-visit-webpage` (Apache-2.0, smolagents
-  `default_tools.py` at 96f33faa): `VisitWebpageTool.forward(url)` is a
-  bare `requests.get(url)` on a model-chosen tool argument with full
-  read-back. `g1-uptime-kuma-browser-monitor` (MIT, uptime-kuma at
+- Corpus: `g1-uptime-kuma-browser-monitor` (MIT, uptime-kuma at
   b61b322c): `RealBrowserMonitorType.check()` scheme-checks then
   `page.goto(monitor.url)` in headless Chromium with no host/range check
   and unchecked redirects (verified live on loopback, screenshot exfil
@@ -83,7 +84,7 @@ Semantic Versioning.
 - Labeled corpus under `corpus/` (CC BY 4.0): 16 instances / 22 samples
   covering every claimed class plus CLEAN exemplars, spanning MCP tool
   servers, webhooks (frappe), link/URL validation (anything-llm), agent
-  browser tools (gptme), and SSRF-safe adapter internals (crewAI), with
+  browser tools (gptme), and SSRF-safe adapter internals, with
   `manifest.jsonl` per-sample labels, generated `EXPECTEDRESULTS.csv`
   rollup, per-instance `metadata.json`, and `NOTICE` attribution.
   `scripts/fetch_corpus.py` materializes fetched instances at pinned SHAs.
